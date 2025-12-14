@@ -1,0 +1,7 @@
+{
+  "name": "Tashkent Rent Finder",
+  "description": "A minimalist, TikTok-style real estate rental app for Telegram with vertical swipe navigation and AI-powered filtering.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
