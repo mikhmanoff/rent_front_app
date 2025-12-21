@@ -3,6 +3,7 @@ import React, { useEffect } from 'react';
 import Feed from './pages/Feed';
 
 const App: React.FC = () => {
+  console.log('📱 App rendering');  // ← добавь
   useEffect(() => {
     if (window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;

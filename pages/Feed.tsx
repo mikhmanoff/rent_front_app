@@ -1,13 +1,27 @@
-
+// pages/Feed.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { mockListings } from '../data/mockListings';
-import { useFilters } from '../hooks/useFilters';
+import { FilterState } from '../types';
+import { useListings } from '../hooks/useListings';
 import ListingCard from '../components/ListingCard';
 import FilterPanel from '../components/FilterPanel';
 import EndScreen from '../components/EndScreen';
 
 const Feed: React.FC = () => {
-  const { filters, setFilters, filteredListings } = useFilters(mockListings);
+  const [filters, setFilters] = useState<FilterState>({
+    priceMin: '',
+    priceMax: '',
+    currency: 'USD',
+    rooms: [],
+    district: [],
+    metro: [],
+    furniture: null,
+    renovation: null,
+    conditioner: null,
+    petsAllowed: null,
+  });
+
+  const { listings, isLoading, error, total, hasMore, loadMore, refresh } = useListings(filters);
+  
   const [favorites, setFavorites] = useState<number[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -35,6 +49,11 @@ const Feed: React.FC = () => {
         if (window.Telegram?.WebApp?.HapticFeedback) {
           window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
         }
+        
+        // Load more when near the end
+        if (index >= listings.length - 3 && hasMore && !isLoading) {
+          loadMore();
+        }
       }
     }
   };
@@ -57,13 +76,40 @@ const Feed: React.FC = () => {
     }
   };
 
+  // Loading state
+  if (isLoading && listings.length === 0) {
+    return (
+      <div className="w-full h-[100dvh] flex flex-col items-center justify-center bg-white">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-gray-500">Загрузка объявлений...</p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && listings.length === 0) {
+    return (
+      <div className="w-full h-[100dvh] flex flex-col items-center justify-center bg-white p-6 text-center">
+        <div className="text-5xl mb-4">😔</div>
+        <p className="text-lg font-bold text-gray-800 mb-2">Ошибка загрузки</p>
+        <p className="text-sm text-gray-500 mb-6">{error}</p>
+        <button 
+          onClick={refresh}
+          className="bg-blue-500 text-white px-6 py-3 rounded-xl font-bold"
+        >
+          Попробовать снова
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full h-[100dvh] bg-white">
       {/* Top Filter Panel */}
       <FilterPanel 
         filters={filters} 
         setFilters={setFilters} 
-        count={filteredListings.length}
+        count={total}
         isOpen={isFilterOpen}
         setIsOpen={setIsFilterOpen}
       />
@@ -74,9 +120,9 @@ const Feed: React.FC = () => {
         onScroll={handleScroll}
         className="w-full h-full overflow-y-scroll snap-y snap-mandatory no-scrollbar"
       >
-        {filteredListings.length > 0 ? (
+        {listings.length > 0 ? (
           <>
-            {filteredListings.map((listing) => (
+            {listings.map((listing) => (
               <ListingCard 
                 key={listing.id} 
                 listing={listing} 
@@ -85,14 +131,23 @@ const Feed: React.FC = () => {
               />
             ))}
             
-            {/* End Screen at the very bottom of the results */}
-            <EndScreen 
-              totalCount={filteredListings.length}
-              filters={filters}
-              onSubscribe={handleSubscribe}
-              onChangeFilters={() => setIsFilterOpen(true)}
-              onRestart={handleRestart}
-            />
+            {/* Loading indicator for infinite scroll */}
+            {isLoading && (
+              <div className="w-full h-[100dvh] snap-start flex items-center justify-center">
+                <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+            
+            {/* End Screen */}
+            {!hasMore && (
+              <EndScreen 
+                totalCount={total}
+                filters={filters}
+                onSubscribe={handleSubscribe}
+                onChangeFilters={() => setIsFilterOpen(true)}
+                onRestart={handleRestart}
+              />
+            )}
           </>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 p-10 text-center bg-white">
