@@ -30,7 +30,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
     <div className="relative w-full h-[100dvh] snap-start flex flex-col bg-white overflow-hidden">
       {/* Photo Area (Reduced to 45vh with max-height) */}
       <div 
-        className="relative h-[45vh] max-h-[350px] w-full flex-shrink-0 cursor-pointer"
+        className="relative h-[65vh] w-full flex-shrink-0 cursor-pointer"
         onClick={() => setShowFullscreen(true)}
       >
         <PhotoSlider 
@@ -41,7 +41,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
       </div>
 
       {/* Info Block (Compact, non-scrollable) */}
-      <div className="flex-1 flex flex-col p-4 bg-white overflow-hidden">
+      <div className="flex-1 flex flex-col p-4 pt-3 bg-white overflow-hidden">
         {/* Price Row */}
         <div className="mb-1">
           <PriceTag 

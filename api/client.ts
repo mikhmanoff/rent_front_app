@@ -147,6 +147,9 @@ export const api = new APIClient();
 
 // Helper для конвертации API ответа в формат фронта
 export function convertToListing(item: ListingFromAPI): import('../types').Listing {
+  // Добавляем базовый URL к фото
+  const photoBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+  
   return {
     id: item.id,
     pricePerMonth: item.price || 0,
@@ -158,7 +161,10 @@ export function convertToListing(item: ListingFromAPI): import('../types').Listi
     address: item.address || item.district || 'Ташкент',
     district: item.district || '',
     metro: item.metro || undefined,
-    photos: item.photos.length > 0 ? item.photos : ['https://via.placeholder.com/800x600?text=No+Photo'],
+    // ← Вот это изменить:
+    photos: item.photos.length > 0 
+      ? item.photos.map(p => `${photoBaseUrl}${p}`) 
+      : ['https://via.placeholder.com/800x600?text=No+Photo'],
     type: 'apartment',
     furniture: item.has_furniture || false,
     renovation: false, // нет в API пока
