@@ -91,7 +91,9 @@ export function useListings(filters: FilterState): UseListingsResult {
       console.log('✅ Got response:', response);  // ← добавь
 
       
-      const newListings = response.items.map(convertToListing);
+      const newListings = response.items
+      .filter(item => item.photos && item.photos.length > 0)
+      .map(convertToListing);
 
       if (reset) {
         setListings(newListings);

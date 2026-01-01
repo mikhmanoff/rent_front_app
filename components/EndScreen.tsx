@@ -64,7 +64,7 @@ const EndScreen: React.FC<EndScreenProps> = ({
       <div className="text-[64px] mb-6">🏠</div>
       
       <h2 className="text-2xl font-bold text-[#1A1A1A] mb-3 leading-tight">
-        Вы посмотрели все {totalCount} объявлений
+        Вы посмотрели все объявления
       </h2>
       
       <p className="text-base text-gray-500 mb-8 leading-relaxed">
