@@ -61,15 +61,15 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
         </div>
 
         {/* Location + Favorite Button Row */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1 text-base font-medium text-gray-500 truncate flex-1 pr-2">
+        <div className="flex justify-between mb-2">
+          <div className="flex items-center gap-1 text-base font-medium text-gray-500 truncate flex-1 pr-2 h-[52px]">
             <span className="text-sm">📍</span>
             <span className="truncate">{listing.address}</span>
           </div>
           
           <button 
             onClick={handleFavClick}
-            className="w-[52px] h-[52px] bg-white border border-gray-100 rounded-xl shadow-md flex flex-col items-center justify-center transition-transform active:scale-90 flex-shrink-0"
+            className="w-[52px] h-[52px] bg-white border border-gray-100 rounded-xl shadow-md flex items-center justify-center transition-transform active:scale-90 flex-shrink-0"
           >
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
@@ -80,7 +80,6 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
-            {/* <span className="text-[10px] font-bold text-gray-700 mt-0.5 leading-none">{localFavCount}</span> */}
           </button>
         </div>
 
