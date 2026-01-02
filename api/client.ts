@@ -183,3 +183,54 @@ export function convertToListing(item: ListingFromAPI): import('../types').Listi
     ownerTelegram: '',
   };
 }
+
+function getInitData(): string {
+  return window.Telegram?.WebApp?.initData || '';
+}
+
+/**
+ * Получить список избранных
+ */
+export async function getFavorites(): Promise<number[]> {
+  const initData = getInitData();
+  if (!initData) return [];
+  
+  const response = await fetch(
+    `${API_BASE}/api/favorites?init_data=${encodeURIComponent(initData)}`
+  );
+  
+  if (!response.ok) return [];
+  
+  const data = await response.json();
+  return data.favorites || [];
+}
+
+/**
+ * Добавить в избранное
+ */
+export async function addFavorite(listingId: number): Promise<boolean> {
+  const initData = getInitData();
+  if (!initData) return false;
+  
+  const response = await fetch(
+    `${API_BASE}/api/favorites/${listingId}?init_data=${encodeURIComponent(initData)}`,
+    { method: 'POST' }
+  );
+  
+  return response.ok;
+}
+
+/**
+ * Удалить из избранного
+ */
+export async function removeFavorite(listingId: number): Promise<boolean> {
+  const initData = getInitData();
+  if (!initData) return false;
+  
+  const response = await fetch(
+    `${API_BASE}/api/favorites/${listingId}?init_data=${encodeURIComponent(initData)}`,
+    { method: 'DELETE' }
+  );
+  
+  return response.ok;
+}

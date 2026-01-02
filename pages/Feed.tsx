@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FilterState } from '../types';
 import { useListings } from '../hooks/useListings';
+import { getFavorites, addFavorite, removeFavorite } from '../api/client';
 import ListingCard from '../components/ListingCard';
 import FilterPanel from '../components/FilterPanel';
 import EndScreen from '../components/EndScreen';
@@ -23,21 +24,65 @@ const Feed: React.FC = () => {
   const { listings, isLoading, error, total, hasMore, loadMore, refresh } = useListings(filters);
   
   const [favorites, setFavorites] = useState<number[]>([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Загружаем избранное при старте
   useEffect(() => {
-    const saved = localStorage.getItem('favorites');
-    if (saved) setFavorites(JSON.parse(saved));
+    async function loadFavorites() {
+      try {
+        // Пробуем загрузить с сервера (для авторизованных через Telegram)
+        const favs = await getFavorites();
+        setFavorites(favs);
+      } catch (err) {
+        console.error('Failed to load favorites from server:', err);
+        // Fallback на localStorage если нет Telegram или ошибка
+        const saved = localStorage.getItem('favorites');
+        if (saved) {
+          try {
+            setFavorites(JSON.parse(saved));
+          } catch {
+            setFavorites([]);
+          }
+        }
+      } finally {
+        setFavoritesLoading(false);
+      }
+    }
+    loadFavorites();
   }, []);
 
-  const toggleFavorite = (id: number) => {
-    const next = favorites.includes(id) 
-      ? favorites.filter(fid => fid !== id) 
+  const toggleFavorite = async (id: number) => {
+    const isFav = favorites.includes(id);
+    
+    // Оптимистичное обновление UI (сразу показываем результат)
+    const newFavorites = isFav 
+      ? favorites.filter(fid => fid !== id)
       : [...favorites, id];
-    setFavorites(next);
-    localStorage.setItem('favorites', JSON.stringify(next));
+    setFavorites(newFavorites);
+
+    // Проверяем, есть ли Telegram авторизация
+    const hasTelegram = !!window.Telegram?.WebApp?.initData;
+
+    if (hasTelegram) {
+      // Синхронизируем с сервером
+      try {
+        if (isFav) {
+          await removeFavorite(id);
+        } else {
+          await addFavorite(id);
+        }
+      } catch (err) {
+        console.error('Failed to sync favorite:', err);
+        // Откатываем при ошибке
+        setFavorites(favorites);
+      }
+    } else {
+      // Fallback: сохраняем в localStorage для не-Telegram пользователей
+      localStorage.setItem('favorites', JSON.stringify(newFavorites));
+    }
   };
 
   const handleScroll = () => {
@@ -77,7 +122,7 @@ const Feed: React.FC = () => {
   };
 
   // Loading state
-  if (isLoading && listings.length === 0) {
+  if ((isLoading && listings.length === 0) || favoritesLoading) {
     return (
       <div className="w-full h-[100dvh] flex flex-col items-center justify-center bg-white">
         <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
