@@ -61,19 +61,19 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
         </div>
 
         {/* Location + Favorite Button Row */}
-        <div className="flex justify-between mb-2">
-          <div className="flex items-center gap-1 text-base font-medium text-gray-500 truncate flex-1 pr-2 h-[52px]">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1 text-base font-medium text-gray-500 truncate flex-1 pr-2">
             <span className="text-sm">📍</span>
             <span className="truncate">{listing.address}</span>
           </div>
           
           <button 
             onClick={handleFavClick}
-            className="w-[52px] h-[52px] bg-white border border-gray-100 rounded-xl shadow-md flex items-center justify-center transition-transform active:scale-90 flex-shrink-0"
+            className="w-10 h-10 bg-white border border-gray-100 rounded-xl shadow-md flex items-center justify-center transition-transform active:scale-90 flex-shrink-0"
           >
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
-              className={`h-6 w-6 transition-colors ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-300'}`} 
+              className={`h-5 w-5 transition-colors ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-300'}`} 
               viewBox="0 0 24 24" 
               stroke="currentColor" 
               strokeWidth={1.5}
