@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Listing } from '../types';
 import PhotoSlider from './PhotoSlider';
@@ -12,6 +11,19 @@ interface ListingCardProps {
   onToggleFavorite: (id: number) => void;
 }
 
+// Функция для форматирования даты "15 янв в 18:52"
+function formatPublishedDate(dateString: string): string {
+  const date = new Date(dateString);
+  
+  const day = date.getDate();
+  const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+  const month = months[date.getMonth()];
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  
+  return `${day} ${month} в ${hours}:${minutes}`;
+}
+
 const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggleFavorite }) => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [showFullscreen, setShowFullscreen] = useState(false);
@@ -19,9 +31,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
   const [localFavCount, setLocalFavCount] = useState(listing.favoritesCount);
 
   const handleFavClick = () => {
-  onToggleFavorite(listing.id);
-  // Убираем локальный подсчёт - он ненадёжен
-  // setLocalFavCount(prev => isFavorite ? prev - 1 : prev + 1);
+    onToggleFavorite(listing.id);
     if (window.Telegram?.WebApp?.HapticFeedback) {
       window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
     }
@@ -29,7 +39,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
 
   return (
     <div className="relative w-full h-[100dvh] snap-start flex flex-col bg-white overflow-hidden">
-      {/* Photo Area (Reduced to 45vh with max-height) */}
+      {/* Photo Area */}
       <div 
         className="relative h-[65vh] w-full flex-shrink-0 cursor-pointer"
         onClick={() => setShowFullscreen(true)}
@@ -41,7 +51,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
         />
       </div>
 
-      {/* Info Block (Compact, non-scrollable) */}
+      {/* Info Block */}
       <div className="flex-1 flex flex-col p-4 pt-3 bg-white overflow-hidden">
         {/* Price Row */}
         <div className="mb-1">
@@ -83,10 +93,15 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
           </button>
         </div>
 
-        {/* Urgency Row: Views + More details link */}
+        {/* Urgency Row: Views + Published time + More details link */}
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">
-            <span className="text-sm">🔥</span> {listing.viewsToday} просмотров
+          <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+            <span className="flex items-center gap-1">
+              <span className="text-sm">🔥</span> {listing.viewsToday} просмотров
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="text-sm">🕐</span> {formatPublishedDate(listing.publishedAt)}
+            </span>
           </div>
           <button 
             onClick={() => setIsDetailsOpen(true)}
@@ -96,7 +111,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
           </button>
         </div>
 
-        {/* Tags Row (Compact) */}
+        {/* Tags Row */}
         <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
           {listing.renovation && <span>Ремонт</span>}
           {listing.renovation && listing.furniture && <span className="text-gray-200">·</span>}
@@ -106,8 +121,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
         </div>
       </div>
 
-      {/* STATIC Action Buttons - Always anchored at the bottom, z-index 102 */}
-      {/* Hidden when fullscreen gallery is open */}
+      {/* STATIC Action Buttons */}
       {!showFullscreen && (
         <div className="p-4 bg-white z-[102] border-t border-gray-50 flex-shrink-0 animate-fade-in">
           <ActionButtons id={listing.id} phone={listing.ownerPhone} telegram={listing.ownerTelegram} />
@@ -126,13 +140,13 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
       {/* Bottom Sheet Modal */}
       {isDetailsOpen && (
         <>
-          {/* Overlay - Z-index 100 */}
+          {/* Overlay */}
           <div 
             className="fixed inset-0 bg-black/50 z-[100] animate-fade-in"
             onClick={() => setIsDetailsOpen(false)}
           />
           
-          {/* Bottom Sheet - Z-index 101 */}
+          {/* Bottom Sheet */}
           <div 
             className="fixed inset-x-0 bottom-0 h-[80vh] bg-white rounded-t-[20px] z-[101] flex flex-col animate-slide-in-up shadow-2xl overflow-hidden"
           >
@@ -142,9 +156,13 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
             </div>
 
             {/* Scrollable Content Area */}
-            {/* Added padding-bottom to clear the static buttons that stay on top */}
             <div className="flex-1 overflow-y-auto px-5 py-2 pb-[160px] no-scrollbar">
               
+              {/* Published Date in Details */}
+              <div className="mb-4 text-sm text-gray-400">
+                Опубликовано: {formatPublishedDate(listing.publishedAt)}
+              </div>
+
               {/* Description Section */}
               <section className="mb-6">
                 <h3 className="text-[18px] font-semibold text-[#1A1A1A] mb-3">Описание</h3>

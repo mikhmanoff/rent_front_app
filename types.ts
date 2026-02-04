@@ -1,4 +1,3 @@
-
 export type Currency = 'UZS' | 'USD';
 export type PropertyType = 'apartment' | 'house' | 'studio';
 
@@ -44,6 +43,9 @@ export interface Listing {
   // Contacts
   ownerPhone: string;
   ownerTelegram: string;
+  
+  // Timestamps
+  publishedAt: string;
 }
 
 export interface FilterState {

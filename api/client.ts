@@ -161,13 +161,12 @@ export function convertToListing(item: ListingFromAPI): import('../types').Listi
     address: item.address || item.district || 'Ташкент',
     district: item.district || '',
     metro: item.metro || undefined,
-    // ← Вот это изменить:
     photos: item.photos.length > 0 
       ? item.photos.map(p => `${photoBaseUrl}${p}`) 
       : ['https://via.placeholder.com/800x600?text=No+Photo'],
     type: 'apartment',
     furniture: item.has_furniture || false,
-    renovation: false, // нет в API пока
+    renovation: false,
     conditioner: item.has_conditioner || false,
     viewsToday: item.views_today,
     favoritesCount: item.favorites_count,
@@ -181,6 +180,8 @@ export function convertToListing(item: ListingFromAPI): import('../types').Listi
     heating: 'central',
     ownerPhone: item.phones[0] || '',
     ownerTelegram: '',
+    // ← ДОБАВЛЕНО: передаём дату публикации
+    publishedAt: item.published_at,
   };
 }
 
