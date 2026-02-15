@@ -1,5 +1,6 @@
-
 import React, { useState, useRef, useEffect } from 'react';
+
+const PLACEHOLDER_PHOTO = 'https://via.placeholder.com/800x600?text=Нет+фото';
 
 interface PhotoSliderProps {
   photos: string[];
@@ -40,6 +41,14 @@ const PhotoSlider: React.FC<PhotoSliderProps> = ({
     }
   };
 
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.target as HTMLImageElement;
+    // Avoid infinite loop if placeholder also fails
+    if (!img.src.includes('placeholder.com')) {
+      img.src = PLACEHOLDER_PHOTO;
+    }
+  };
+
   return (
     <div className="relative w-full h-full group" onClick={onPhotoClick}>
       <div 
@@ -54,6 +63,7 @@ const PhotoSlider: React.FC<PhotoSliderProps> = ({
               alt={`Property photo ${i + 1}`} 
               className="w-full h-full object-cover"
               loading="lazy"
+              onError={handleImageError}
             />
           </div>
         ))}

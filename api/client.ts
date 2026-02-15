@@ -145,10 +145,29 @@ class APIClient {
 // Singleton instance
 export const api = new APIClient();
 
+// ============================================
+// FIX: Правильное построение URL фото
+// ============================================
+function buildPhotoUrl(photoPath: string): string {
+  // Если уже полный URL — не трогаем
+  if (photoPath.startsWith('http://') || photoPath.startsWith('https://')) {
+    return photoPath;
+  }
+  
+  const base = (import.meta.env.VITE_API_URL || 'http://localhost:8001').replace(/\/$/, '');
+  const path = photoPath.startsWith('/') ? photoPath : `/${photoPath}`;
+  
+  return `${base}${path}`;
+}
+
+const PLACEHOLDER_PHOTO = 'https://via.placeholder.com/800x600?text=Нет+фото';
+
 // Helper для конвертации API ответа в формат фронта
 export function convertToListing(item: ListingFromAPI): import('../types').Listing {
-  // Добавляем базовый URL к фото
-  const photoBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+  // Фильтруем пустые пути и строим правильные URL
+  const photos = item.photos
+    .filter(p => p && p.trim() !== '')
+    .map(buildPhotoUrl);
   
   return {
     id: item.id,
@@ -161,9 +180,7 @@ export function convertToListing(item: ListingFromAPI): import('../types').Listi
     address: item.address || item.district || 'Ташкент',
     district: item.district || '',
     metro: item.metro || undefined,
-    photos: item.photos.length > 0 
-      ? item.photos.map(p => `${photoBaseUrl}${p}`) 
-      : ['https://via.placeholder.com/800x600?text=No+Photo'],
+    photos: photos.length > 0 ? photos : [PLACEHOLDER_PHOTO],
     type: 'apartment',
     furniture: item.has_furniture || false,
     renovation: false,
@@ -180,7 +197,6 @@ export function convertToListing(item: ListingFromAPI): import('../types').Listi
     heating: 'central',
     ownerPhone: item.phones[0] || '',
     ownerTelegram: '',
-    // ← ДОБАВЛЕНО: передаём дату публикации
     publishedAt: item.published_at,
   };
 }

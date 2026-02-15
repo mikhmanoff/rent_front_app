@@ -1,5 +1,6 @@
-
 import React, { useState, useRef, useEffect } from 'react';
+
+const PLACEHOLDER_PHOTO = 'https://via.placeholder.com/800x600?text=Нет+фото';
 
 interface FullscreenGalleryProps {
   photos: string[];
@@ -43,6 +44,13 @@ const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({ photos, initialIn
     }
   };
 
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.target as HTMLImageElement;
+    if (!img.src.includes('placeholder.com')) {
+      img.src = PLACEHOLDER_PHOTO;
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black z-[200] flex flex-col animate-fade-in touch-none">
       {/* Header with Close Button */}
@@ -71,6 +79,7 @@ const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({ photos, initialIn
               alt={`Property photo ${index + 1}`} 
               className="max-w-full max-h-full object-contain select-none"
               loading="lazy"
+              onError={handleImageError}
             />
           </div>
         ))}
