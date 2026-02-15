@@ -1,15 +1,19 @@
-
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Feed from './pages/Feed';
+import Favorites from './pages/Favorites';
+
+type Page = 'feed' | 'favorites';
 
 const App: React.FC = () => {
-  console.log('📱 App rendering');  // ← добавь
+  const [currentPage, setCurrentPage] = useState<Page>('feed');
+  const [favorites, setFavorites] = useState<number[]>([]);
+  const [favoritesLoaded, setFavoritesLoaded] = useState(false);
+
   useEffect(() => {
     if (window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
       tg.ready();
       tg.expand();
-      // Set light theme colors
       tg.headerColor = '#ffffff';
       tg.backgroundColor = '#ffffff';
     }
@@ -17,7 +21,22 @@ const App: React.FC = () => {
 
   return (
     <div className="h-[100dvh] w-full bg-white overflow-hidden font-sans antialiased">
-      <Feed />
+      {currentPage === 'feed' && (
+        <Feed 
+          favorites={favorites}
+          setFavorites={setFavorites}
+          favoritesLoaded={favoritesLoaded}
+          setFavoritesLoaded={setFavoritesLoaded}
+          onOpenFavorites={() => setCurrentPage('favorites')}
+        />
+      )}
+      {currentPage === 'favorites' && (
+        <Favorites 
+          favorites={favorites}
+          setFavorites={setFavorites}
+          onBack={() => setCurrentPage('feed')}
+        />
+      )}
     </div>
   );
 };

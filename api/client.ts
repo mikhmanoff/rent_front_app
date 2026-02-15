@@ -251,3 +251,30 @@ export async function removeFavorite(listingId: number): Promise<boolean> {
   
   return response.ok;
 }
+
+/**
+ * Получить полные данные избранных объявлений
+ */
+export async function getFavoriteListings(
+  page: number = 1, 
+  pageSize: number = 20
+): Promise<ListingsResponse> {
+  const initData = getInitData();
+  if (!initData) {
+    return { items: [], total: 0, page: 1, page_size: pageSize, has_more: false };
+  }
+  
+  const params = new URLSearchParams({
+    init_data: initData,
+    page: page.toString(),
+    page_size: pageSize.toString(),
+  });
+  
+  const response = await fetch(`${API_BASE}/api/favorites/listings?${params}`);
+  
+  if (!response.ok) {
+    return { items: [], total: 0, page: 1, page_size: pageSize, has_more: false };
+  }
+  
+  return response.json();
+}

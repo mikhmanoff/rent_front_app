@@ -7,7 +7,19 @@ import ListingCard from '../components/ListingCard';
 import FilterPanel from '../components/FilterPanel';
 import EndScreen from '../components/EndScreen';
 
-const Feed: React.FC = () => {
+interface FeedProps {
+  favorites: number[];
+  setFavorites: (favs: number[]) => void;
+  favoritesLoaded: boolean;
+  setFavoritesLoaded: (loaded: boolean) => void;
+  onOpenFavorites: () => void;
+}
+
+const Feed: React.FC<FeedProps> = ({ 
+  favorites, setFavorites, 
+  favoritesLoaded, setFavoritesLoaded,
+  onOpenFavorites 
+}) => {
   const [filters, setFilters] = useState<FilterState>({
     priceMin: '',
     priceMax: '',
@@ -23,51 +35,42 @@ const Feed: React.FC = () => {
 
   const { listings, isLoading, error, total, hasMore, loadMore, refresh } = useListings(filters);
   
-  const [favorites, setFavorites] = useState<number[]>([]);
-  const [favoritesLoading, setFavoritesLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Загружаем избранное при старте
+  // Загружаем избранное при старте (один раз)
   useEffect(() => {
+    if (favoritesLoaded) return;
+    
     async function loadFavorites() {
       try {
-        // Пробуем загрузить с сервера (для авторизованных через Telegram)
         const favs = await getFavorites();
         setFavorites(favs);
       } catch (err) {
         console.error('Failed to load favorites from server:', err);
-        // Fallback на localStorage если нет Telegram или ошибка
         const saved = localStorage.getItem('favorites');
         if (saved) {
-          try {
-            setFavorites(JSON.parse(saved));
-          } catch {
-            setFavorites([]);
-          }
+          try { setFavorites(JSON.parse(saved)); } catch { setFavorites([]); }
         }
       } finally {
-        setFavoritesLoading(false);
+        setFavoritesLoaded(true);
       }
     }
     loadFavorites();
-  }, []);
+  }, [favoritesLoaded]);
 
   const toggleFavorite = async (id: number) => {
     const isFav = favorites.includes(id);
     
-    // Оптимистичное обновление UI (сразу показываем результат)
     const newFavorites = isFav 
       ? favorites.filter(fid => fid !== id)
       : [...favorites, id];
     setFavorites(newFavorites);
 
-    // Проверяем, есть ли Telegram авторизация
     const hasTelegram = !!window.Telegram?.WebApp?.initData;
 
     if (hasTelegram) {
-      // Синхронизируем с сервером
       try {
         if (isFav) {
           await removeFavorite(id);
@@ -76,11 +79,9 @@ const Feed: React.FC = () => {
         }
       } catch (err) {
         console.error('Failed to sync favorite:', err);
-        // Откатываем при ошибке
         setFavorites(favorites);
       }
     } else {
-      // Fallback: сохраняем в localStorage для не-Telegram пользователей
       localStorage.setItem('favorites', JSON.stringify(newFavorites));
     }
   };
@@ -95,7 +96,6 @@ const Feed: React.FC = () => {
           window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
         }
         
-        // Load more when near the end
         if (index >= listings.length - 3 && hasMore && !isLoading) {
           loadMore();
         }
@@ -122,7 +122,7 @@ const Feed: React.FC = () => {
   };
 
   // Loading state
-  if ((isLoading && listings.length === 0) || favoritesLoading) {
+  if ((isLoading && listings.length === 0) || !favoritesLoaded) {
     return (
       <div className="w-full h-[100dvh] flex flex-col items-center justify-center bg-white">
         <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
@@ -150,7 +150,7 @@ const Feed: React.FC = () => {
 
   return (
     <div className="relative w-full h-[100dvh] bg-white">
-      {/* Top Filter Panel */}
+      {/* Top buttons: Filter + Favorites */}
       <FilterPanel 
         filters={filters} 
         setFilters={setFilters} 
@@ -158,8 +158,28 @@ const Feed: React.FC = () => {
         isOpen={isFilterOpen}
         setIsOpen={setIsFilterOpen}
       />
+
+      {/* Favorites button */}
+      <button 
+        onClick={onOpenFavorites}
+        className="fixed top-4 right-4 z-40 bg-black/20 backdrop-blur-md w-10 h-10 rounded-full border border-white/10 flex items-center justify-center active:scale-95 transition-transform"
+      >
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          className="h-5 w-5 text-white" 
+          viewBox="0 0 24 24" 
+          fill="currentColor"
+        >
+          <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+        </svg>
+        {favorites.length > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+            {favorites.length > 99 ? '99' : favorites.length}
+          </span>
+        )}
+      </button>
       
-      {/* Vertical Feed with Snap Scrolling */}
+      {/* Vertical Feed */}
       <div 
         ref={scrollRef}
         onScroll={handleScroll}
@@ -176,14 +196,12 @@ const Feed: React.FC = () => {
               />
             ))}
             
-            {/* Loading indicator for infinite scroll */}
             {isLoading && (
               <div className="w-full h-[100dvh] snap-start flex items-center justify-center">
                 <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
               </div>
             )}
             
-            {/* End Screen */}
             {!hasMore && (
               <EndScreen 
                 totalCount={total}
