@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+
+const UNLOCK_DURATION_MS = 60 * 60 * 1000; // 1 час
+const SHARE_DELAY_SEC = 15; // 15 секунд лаг после нажатия
 
 interface ShareGateProps {
   listingId: number;
   shareText: string;
-  initialShareCount: number;
-  requiredShares: number;
   onUnlocked: () => void;
   onClose: () => void;
 }
@@ -12,65 +13,83 @@ interface ShareGateProps {
 const ShareGate: React.FC<ShareGateProps> = ({
   listingId,
   shareText,
-  initialShareCount,
-  requiredShares,
   onUnlocked,
   onClose,
 }) => {
-  const [shareCount, setShareCount] = useState(initialShareCount);
-  const [justShared, setJustShared] = useState(false);
+  const [countdown, setCountdown] = useState(0); // обратный отсчёт в секундах
+  const [isWaiting, setIsWaiting] = useState(false);
+  const [shared, setShared] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const isUnlocked = shareCount >= requiredShares;
   const tg = window.Telegram?.WebApp;
   const haptic = tg?.HapticFeedback;
 
+  // Проверяем глобальный unlock при открытии
   useEffect(() => {
-    if (isUnlocked) {
-      const timer = setTimeout(() => {
-        haptic?.notificationOccurred('success');
-        onUnlocked();
-      }, 800);
-      return () => clearTimeout(timer);
+    if (isGloballyUnlocked()) {
+      haptic?.notificationOccurred('success');
+      onUnlocked();
     }
-  }, [isUnlocked]);
+  }, []);
+
+  // Таймер обратного отсчёта
+  useEffect(() => {
+    if (countdown > 0) {
+      timerRef.current = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            if (timerRef.current) clearInterval(timerRef.current);
+            // Время вышло — засчитываем шару
+            setGlobalUnlock();
+            setShared(true);
+            recordShareToServer(listingId);
+            haptic?.notificationOccurred('success');
+            setTimeout(() => onUnlocked(), 600);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+      };
+    }
+  }, [isWaiting]);
 
   const handleShare = () => {
     haptic?.impactOccurred('medium');
 
-    // 1. СРАЗУ засчитываем шару ДО открытия диалога
-    const newCount = shareCount + 1;
-    setShareCount(newCount);
-    setJustShared(true);
-    recordShare(listingId, newCount);
-    setTimeout(() => setJustShared(false), 2000);
+    // Ссылка на бота
+    const botUsername = import.meta.env.VITE_BOT_USERNAME || 'rentaly_bot';
+    const botUrl = `https://t.me/${botUsername}/app`;
+    const messageText = `${shareText}\n\n🔍 Найди квартиру мечты в Ташкенте:`;
 
-    // 2. Формируем текст
-    const botUsername = import.meta.env.VITE_BOT_USERNAME || 'your_bot_name';
-    const shareUrl = `https://t.me/${botUsername}/app?startapp=listing_${listingId}`;
-    const fullText = `${shareText}\n\n👉 Смотреть: ${shareUrl}`;
+    // Открываем share dialog
+    if (tg?.openTelegramLink) {
+      const params = new URLSearchParams({
+        url: botUrl,
+        text: messageText,
+      });
+      tg.openTelegramLink(`https://t.me/share/url?${params.toString()}`);
+    } else {
+      const fullText = `${messageText}\n${botUrl}`;
+      navigator.clipboard?.writeText(fullText);
+      tg?.showAlert?.('Ссылка скопирована! Отправьте её друзьям.');
+    }
 
-    // 3. Открываем share dialog ПОСЛЕ засчитывания
-    setTimeout(() => {
-      if (tg?.openTelegramLink) {
-        const encoded = encodeURIComponent(fullText);
-        tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encoded}`);
-      } else if (tg?.switchInlineQuery) {
-        tg.switchInlineQuery(fullText, ['users', 'groups', 'channels']);
-      } else {
-        navigator.clipboard?.writeText(fullText);
-        tg?.showAlert?.('Ссылка скопирована! Отправьте её друзьям.');
-      }
-    }, 100);
+    // Запускаем обратный отсчёт 15 секунд
+    setIsWaiting(true);
+    setCountdown(SHARE_DELAY_SEC);
   };
 
-  const progress = Math.min(shareCount / requiredShares, 1);
+  const progress = countdown > 0 ? (SHARE_DELAY_SEC - countdown) / SHARE_DELAY_SEC : 0;
 
   return (
     <>
       {/* Overlay */}
       <div 
         className="fixed inset-0 bg-black/60 z-[150] animate-fade-in backdrop-blur-sm"
-        onClick={onClose}
+        onClick={!isWaiting ? onClose : undefined}
       />
       
       {/* Bottom Sheet */}
@@ -81,58 +100,61 @@ const ShareGate: React.FC<ShareGateProps> = ({
           </div>
 
           <div className="px-6 pb-8 pt-2">
+            {/* Icon + Title */}
             <div className="text-center mb-6">
               <div className="text-[56px] mb-3">
-                {isUnlocked ? '🎉' : '🔒'}
+                {shared ? '🎉' : isWaiting ? '⏳' : '🔒'}
               </div>
               <h2 className="text-[22px] font-bold text-[#1A1A1A] mb-2 leading-tight">
-                {isUnlocked 
-                  ? 'Номер разблокирован!' 
-                  : 'Поделитесь, чтобы увидеть номер'}
+                {shared 
+                  ? 'Номера открыты на 1 час!' 
+                  : isWaiting 
+                    ? 'Подождите...'
+                    : 'Поделитесь, чтобы увидеть номер'
+                }
               </h2>
               <p className="text-[15px] text-gray-500 leading-relaxed">
-                {isUnlocked 
-                  ? 'Спасибо, что помогаете другим найти жильё'
-                  : `Отправьте это объявление ${requiredShares} друзьям, и мы покажем контакт владельца`
+                {shared 
+                  ? 'Спасибо! Теперь все контакты доступны'
+                  : isWaiting 
+                    ? 'Отправьте объявление другу в открывшемся окне'
+                    : 'Отправьте это объявление другу, и мы откроем все номера на 1 час'
                 }
               </p>
             </div>
 
-            <div className="mb-6">
-              <div className="relative h-3 bg-gray-100 rounded-full overflow-hidden mb-2">
-                <div 
-                  className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
-                  style={{ 
-                    width: `${progress * 100}%`,
-                    background: isUnlocked 
-                      ? 'linear-gradient(90deg, #10B981, #34D399)' 
-                      : 'linear-gradient(90deg, #2481cc, #60a5fa)'
-                  }}
-                />
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-[13px] font-bold text-gray-400 uppercase tracking-wider">
-                  Прогресс
-                </span>
-                <div className="flex items-center gap-1.5">
-                  {Array.from({ length: requiredShares }).map((_, i) => (
-                    <div 
-                      key={i}
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 ${
-                        i < shareCount 
-                          ? 'bg-[#2481cc] text-white scale-110' 
-                          : 'bg-gray-100 text-gray-300'
-                      } ${i === shareCount - 1 && justShared ? 'animate-bounce' : ''}`}
-                    >
-                      {i < shareCount ? '✓' : i + 1}
+            {/* Countdown timer */}
+            {isWaiting && countdown > 0 && (
+              <div className="mb-6">
+                {/* Circular progress */}
+                <div className="flex justify-center mb-4">
+                  <div className="relative w-20 h-20">
+                    <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+                      <circle cx="40" cy="40" r="35" fill="none" stroke="#F0F0F0" strokeWidth="6" />
+                      <circle 
+                        cx="40" cy="40" r="35" fill="none" 
+                        stroke="#2481cc" strokeWidth="6"
+                        strokeLinecap="round"
+                        strokeDasharray={`${2 * Math.PI * 35}`}
+                        strokeDashoffset={`${2 * Math.PI * 35 * (1 - progress)}`}
+                        className="transition-all duration-1000 ease-linear"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-[24px] font-bold text-[#2481cc] tabular-nums">
+                        {countdown}
+                      </span>
                     </div>
-                  ))}
+                  </div>
                 </div>
+                <p className="text-center text-[13px] text-gray-400 font-medium">
+                  Номер откроется через {countdown} сек
+                </p>
               </div>
-            </div>
+            )}
 
-            {!isUnlocked && (
+            {/* Share Button — only before sharing */}
+            {!isWaiting && !shared && (
               <button 
                 onClick={handleShare}
                 className="w-full py-5 rounded-2xl font-bold text-[17px] flex items-center justify-center gap-3 transition-all shadow-lg active:scale-[0.98] bg-[#2481cc] text-white"
@@ -140,11 +162,11 @@ const ShareGate: React.FC<ShareGateProps> = ({
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
-                Поделиться с другом ({shareCount}/{requiredShares})
+                Отправить другу
               </button>
             )}
 
-            {!isUnlocked && (
+            {!isWaiting && !shared && (
               <button 
                 onClick={onClose}
                 className="w-full mt-4 text-center text-gray-400 text-[13px] font-medium"
@@ -160,27 +182,37 @@ const ShareGate: React.FC<ShareGateProps> = ({
 };
 
 // ============================================
-// Helpers
+// Global unlock logic (1 hour access)
 // ============================================
 
-const SHARE_STORAGE_KEY = 'share_counts';
+const GLOBAL_UNLOCK_KEY = 'global_unlock_until';
 
-export function getLocalShareCount(listingId: number): number {
+export function isGloballyUnlocked(): boolean {
   try {
-    const data = JSON.parse(localStorage.getItem(SHARE_STORAGE_KEY) || '{}');
-    return data[listingId] || 0;
+    const until = parseInt(localStorage.getItem(GLOBAL_UNLOCK_KEY) || '0');
+    return Date.now() < until;
+  } catch {
+    return false;
+  }
+}
+
+function setGlobalUnlock() {
+  try {
+    const until = Date.now() + UNLOCK_DURATION_MS;
+    localStorage.setItem(GLOBAL_UNLOCK_KEY, until.toString());
+  } catch {}
+}
+
+export function getUnlockTimeRemaining(): number {
+  try {
+    const until = parseInt(localStorage.getItem(GLOBAL_UNLOCK_KEY) || '0');
+    return Math.max(0, until - Date.now());
   } catch {
     return 0;
   }
 }
 
-function recordShare(listingId: number, count: number) {
-  try {
-    const data = JSON.parse(localStorage.getItem(SHARE_STORAGE_KEY) || '{}');
-    data[listingId] = count;
-    localStorage.setItem(SHARE_STORAGE_KEY, JSON.stringify(data));
-  } catch {}
-
+function recordShareToServer(listingId: number) {
   const initData = window.Telegram?.WebApp?.initData;
   if (initData) {
     const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001';
@@ -191,26 +223,17 @@ function recordShare(listingId: number, count: number) {
   }
 }
 
-export async function getServerShareCount(listingId: number): Promise<number> {
-  const initData = window.Telegram?.WebApp?.initData;
-  if (!initData) return getLocalShareCount(listingId);
-
-  try {
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-    const resp = await fetch(
-      `${API_BASE}/api/shares/${listingId}?init_data=${encodeURIComponent(initData)}`
-    );
-    if (resp.ok) {
-      const data = await resp.json();
-      return data.count || 0;
-    }
-  } catch {}
-
-  return getLocalShareCount(listingId);
+// Legacy exports for compatibility
+export function getLocalShareCount(listingId: number): number {
+  return isGloballyUnlocked() ? 99 : 0;
 }
 
-export function isContactUnlocked(listingId: number, requiredShares: number = 2): boolean {
-  return getLocalShareCount(listingId) >= requiredShares;
+export async function getServerShareCount(listingId: number): Promise<number> {
+  return isGloballyUnlocked() ? 99 : 0;
+}
+
+export function isContactUnlocked(listingId: number, requiredShares: number = 1): boolean {
+  return isGloballyUnlocked();
 }
 
 export default ShareGate;

@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import ShareGate, { getLocalShareCount, getServerShareCount, isContactUnlocked } from './ShareGate';
-
-const REQUIRED_SHARES = 2; // Сколько шар нужно для разблокировки
+import ShareGate, { isGloballyUnlocked, getUnlockTimeRemaining } from './ShareGate';
 
 interface ActionButtonsProps {
   id: number;
   phone: string;
   telegram: string;
-  /** Краткое описание для шаринга (цена, комнаты, район) */
   shareDescription?: string;
 }
 
@@ -17,28 +14,30 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
 
   const [showShareGate, setShowShareGate] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
-  const [shareCount, setShareCount] = useState(0);
   const [pendingAction, setPendingAction] = useState<'call' | 'message' | null>(null);
+  const [unlockMinutes, setUnlockMinutes] = useState(0);
 
-  // Загружаем статус разблокировки при монтировании
+  // Проверяем глобальный unlock
   useEffect(() => {
-    const localCount = getLocalShareCount(id);
-    setShareCount(localCount);
-    setUnlocked(localCount >= REQUIRED_SHARES);
-
-    // Асинхронно проверяем серверные данные
-    getServerShareCount(id).then(serverCount => {
-      const maxCount = Math.max(localCount, serverCount);
-      setShareCount(maxCount);
-      setUnlocked(maxCount >= REQUIRED_SHARES);
-    });
-  }, [id]);
+    const check = () => {
+      const isUnlocked = isGloballyUnlocked();
+      setUnlocked(isUnlocked);
+      if (isUnlocked) {
+        const remaining = getUnlockTimeRemaining();
+        setUnlockMinutes(Math.ceil(remaining / 60000));
+      }
+    };
+    check();
+    const interval = setInterval(check, 10000); // проверяем каждые 10 сек
+    return () => clearInterval(interval);
+  }, []);
 
   const handleShare = () => {
     haptic?.impactOccurred('light');
-    const url = `https://t.me/your_bot_name/app?startapp=${id}`;
-    if (tg?.switchInlineQuery) {
-      tg.switchInlineQuery(url, ['users', 'groups', 'channels']);
+    const botUsername = import.meta.env.VITE_BOT_USERNAME || 'rentaly_bot';
+    const url = `https://t.me/${botUsername}/app`;
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent('Смотри какие квартиры в Ташкенте! 🏠')}`);
     } else {
       navigator.clipboard.writeText(url);
     }
@@ -65,22 +64,14 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
     if (telegram) {
       const username = telegram.replace('@', '');
       const tgUrl = `https://t.me/${username}`;
-      if (tg?.openTelegramLink) {
-        tg.openTelegramLink(tgUrl);
-      } else {
-        window.open(tgUrl, '_blank');
-      }
+      tg?.openTelegramLink ? tg.openTelegramLink(tgUrl) : window.open(tgUrl, '_blank');
       return;
     }
 
     if (phone) {
       const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
       const tgUrl = `https://t.me/${cleanPhone}`;
-      if (tg?.openTelegramLink) {
-        tg.openTelegramLink(tgUrl);
-      } else {
-        window.open(tgUrl, '_blank');
-      }
+      tg?.openTelegramLink ? tg.openTelegramLink(tgUrl) : window.open(tgUrl, '_blank');
       return;
     }
 
@@ -92,15 +83,9 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
       tg?.showAlert?.('Номер телефона не указан');
       return;
     }
-
     haptic?.impactOccurred('light');
-
     try {
-      if (tg?.openLink) {
-        tg.openLink(`tel:${phone}`);
-      } else {
-        window.location.href = `tel:${phone}`;
-      }
+      tg?.openLink ? tg.openLink(`tel:${phone}`) : (window.location.href = `tel:${phone}`);
     } catch {
       navigator.clipboard?.writeText(phone);
       tg?.showAlert?.(`Номер скопирован: ${phone}`);
@@ -110,8 +95,8 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
   const handleUnlocked = () => {
     setUnlocked(true);
     setShowShareGate(false);
+    setUnlockMinutes(60);
 
-    // Выполняем отложенное действие
     if (pendingAction === 'message') {
       setTimeout(doMessage, 300);
     } else if (pendingAction === 'call') {
@@ -120,15 +105,22 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
     setPendingAction(null);
   };
 
-  const shareText = shareDescription || `Смотри какую квартиру нашёл в Ташкенте! 🏠`;
+  const shareText = shareDescription || 'Смотри какую квартиру нашёл в Ташкенте! 🏠';
 
   return (
     <>
       <div className="flex flex-col gap-3 w-full">
+        {/* Unlock badge */}
+        {unlocked && (
+          <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-green-600 uppercase tracking-wider">
+            <span>✅</span> Номера открыты · {unlockMinutes} мин осталось
+          </div>
+        )}
+
         {/* Primary: Написать */}
         <button 
           onClick={() => handleContactAction('message')}
-          className="w-full bg-[#2481cc] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-md relative overflow-hidden"
+          className="w-full bg-[#2481cc] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-md"
         >
           {!unlocked && (
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 opacity-70" viewBox="0 0 20 20" fill="currentColor">
@@ -138,14 +130,14 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
           </svg>
-          {unlocked ? 'Написать' : 'Написать · Поделитесь чтобы открыть'}
+          Написать
         </button>
 
         {/* Secondary: Позвонить + Поделиться */}
         <div className="grid grid-cols-2 gap-3 w-full">
           <button 
             onClick={() => handleContactAction('call')}
-            className="bg-white border border-gray-200 text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm relative"
+            className="bg-white border border-gray-200 text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm"
           >
             {!unlocked && (
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
@@ -174,8 +166,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
         <ShareGate
           listingId={id}
           shareText={shareText}
-          initialShareCount={shareCount}
-          requiredShares={REQUIRED_SHARES}
           onUnlocked={handleUnlocked}
           onClose={() => {
             setShowShareGate(false);
