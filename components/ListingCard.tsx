@@ -24,6 +24,23 @@ function formatPublishedDate(dateString: string): string {
   return `${day} ${month} в ${hours}:${minutes}`;
 }
 
+function buildShareDescription(listing: Listing): string {
+  const price = listing.currency === 'USD' 
+    ? `$${listing.pricePerMonth}` 
+    : `${listing.pricePerMonth.toLocaleString()} сум`;
+  
+  const parts = [
+    `🏠 ${listing.rooms} комн, ${listing.area} м²`,
+    `💰 ${price}/мес`,
+    `📍 ${listing.address}`,
+  ];
+  
+  if (listing.furniture) parts.push('✅ Мебель');
+  if (listing.conditioner) parts.push('✅ Кондиционер');
+  
+  return parts.join('\n');
+}
+
 const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggleFavorite }) => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [showFullscreen, setShowFullscreen] = useState(false);
@@ -36,6 +53,8 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
       window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
     }
   };
+
+  const shareDescription = buildShareDescription(listing);
 
   return (
     <div className="relative w-full h-[100dvh] snap-start flex flex-col bg-white overflow-hidden">
@@ -121,10 +140,15 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
         </div>
       </div>
 
-      {/* STATIC Action Buttons */}
+      {/* STATIC Action Buttons — now with share-to-unlock */}
       {!showFullscreen && (
         <div className="p-4 bg-white z-[102] border-t border-gray-50 flex-shrink-0 animate-fade-in">
-          <ActionButtons id={listing.id} phone={listing.ownerPhone} telegram={listing.ownerTelegram} />
+          <ActionButtons 
+            id={listing.id} 
+            phone={listing.ownerPhone} 
+            telegram={listing.ownerTelegram}
+            shareDescription={shareDescription}
+          />
         </div>
       )}
 
