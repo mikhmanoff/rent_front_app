@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FilterState, Currency } from '../types';
 import MultiSelectBottomSheet from './MultiSelectBottomSheet';
+import { api } from '../api/client';
 
 interface FilterPanelProps {
   filters: FilterState;
@@ -9,32 +10,6 @@ interface FilterPanelProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
 }
-
-const districts = [
-  { id: 'yunusabad', name: 'Юнусабад' },
-  { id: 'chilanzar', name: 'Чиланзар' },
-  { id: 'mirzo_ulugbek', name: 'Мирзо Улугбек' },
-  { id: 'sergeli', name: 'Сергели' },
-  { id: 'yakkasaray', name: 'Яккасарай' },
-  { id: 'mirabad', name: 'Мирабад' },
-  { id: 'shaykhantahur', name: 'Шайхантахур' },
-  { id: 'almazar', name: 'Алмазар' },
-  { id: 'bektemir', name: 'Бектемир' },
-  { id: 'yashnabad', name: 'Яшнабад' },
-  { id: 'uchtepa', name: 'Учтепа' }
-];
-
-const metroStations = [
-  { id: 'buyuk_ipak', name: 'Буюк Ипак Йули' },
-  { id: 'kosmonavtlar', name: 'Космонавтлар' },
-  { id: 'oybek', name: 'Ойбек' },
-  { id: 'amir_temur', name: 'Амир Темур' },
-  { id: 'chorsu', name: 'Чорсу' },
-  { id: 'minor', name: 'Минор' },
-  { id: 'bodomzor', name: 'Бодомзор' },
-  { id: 'novza', name: 'Новза' },
-  { id: 'pushkin', name: 'Пушкин' }
-];
 
 const DEFAULT_FILTERS: FilterState = {
   priceMin: '',
@@ -58,12 +33,11 @@ function countActiveFilters(f: FilterState): number {
   return count;
 }
 
-// Собирает query params из черновика фильтров
 function buildPreviewParams(draft: FilterState): string {
   const params = new URLSearchParams();
   params.set('deal_type', 'rent_long');
   params.set('page', '1');
-  params.set('page_size', '1'); // нам нужен только total
+  params.set('page_size', '1');
 
   if (draft.rooms.length > 0) {
     const mapped = draft.rooms.map(r => {
@@ -89,29 +63,71 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
   const [isLoadingCount, setIsLoadingCount] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Справочники из API
+  const [districts, setDistricts] = useState<{ id: string; name: string }[]>([]);
+  const [metroStations, setMetroStations] = useState<{ id: string; name: string }[]>([]);
+  const [refLoaded, setRefLoaded] = useState(false);
+
   const activeCount = countActiveFilters(filters);
+
+  // Загружаем справочники из API один раз
+  useEffect(() => {
+    if (refLoaded) return;
+    async function loadRef() {
+      try {
+        const [dData, mData] = await Promise.all([
+          api.getDistricts(),
+          api.getMetroStations(),
+        ]);
+        setDistricts(dData.map(d => ({ id: d.id.toString(), name: d.name_ru })));
+        setMetroStations(mData.map(m => ({ id: m.id.toString(), name: m.name_ru })));
+        setRefLoaded(true);
+      } catch (err) {
+        console.error('Failed to load reference data:', err);
+        // Fallback — захардкоженные
+        setDistricts([
+          { id: '1', name: 'Алмазарский район' },
+          { id: '2', name: 'Бектемирский район' },
+          { id: '3', name: 'Мирабадский район' },
+          { id: '4', name: 'Мирзо-Улугбекский район' },
+          { id: '5', name: 'Сергелийский район' },
+          { id: '6', name: 'Учтепинский район' },
+          { id: '7', name: 'Чиланзарский район' },
+          { id: '8', name: 'Шайхантаурский район' },
+          { id: '9', name: 'Юнусабадский район' },
+          { id: '10', name: 'Яккасарайский район' },
+          { id: '11', name: 'Яшнабадский район' },
+        ]);
+        setMetroStations([
+          { id: '1', name: 'Буюк Ипак Йули' },
+          { id: '2', name: 'Пушкин' },
+          { id: '4', name: 'Ойбек' },
+          { id: '7', name: 'Юнус Ражабий' },
+          { id: '8', name: 'Минор' },
+          { id: '10', name: 'Чиланзар' },
+          { id: '12', name: 'Новза' },
+          { id: '19', name: 'Бодомзор' },
+        ]);
+        setRefLoaded(true);
+      }
+    }
+    loadRef();
+  }, [refLoaded]);
 
   // Синхронизируем черновик при открытии
   useEffect(() => {
     if (isOpen) {
       setDraft({ ...filters });
-      setPreviewCount(count); // начинаем с текущего count
+      setPreviewCount(count);
     }
   }, [isOpen]);
 
-  // Запрашиваем preview count при изменении черновика (с debounce)
+  // Preview count с debounce
   useEffect(() => {
     if (!isOpen) return;
-
-    // Debounce 400ms
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      fetchPreviewCount(draft);
-    }, 400);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    debounceRef.current = setTimeout(() => fetchPreviewCount(draft), 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [
     draft.rooms.join(','),
     draft.priceMin,
@@ -155,9 +171,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
     return `${selectedNames[0]} +${selectedNames.length - 1}`;
   };
 
-  const resetDraft = () => {
-    setDraft({ ...DEFAULT_FILTERS });
-  };
+  const resetDraft = () => setDraft({ ...DEFAULT_FILTERS });
 
   const applyFilters = () => {
     setFilters({ ...draft });
@@ -165,11 +179,6 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('medium');
   };
 
-  const closeWithoutApply = () => {
-    setIsOpen(false);
-  };
-
-  // Текст кнопки
   const buttonText = isLoadingCount
     ? 'Считаем...'
     : previewCount !== null && previewCount > 0
@@ -196,40 +205,31 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
       {/* Full-screen filter panel */}
       {isOpen && (
         <div className="fixed inset-0 z-[200] bg-white flex flex-col animate-slide-in-up">
-          {/* Header */}
           <div className="flex items-center justify-between p-5 border-b border-gray-100 flex-shrink-0">
             <h2 className="text-xl font-bold">Фильтры</h2>
-            <button onClick={closeWithoutApply} className="p-2 text-black">
+            <button onClick={() => setIsOpen(false)} className="p-2 text-black">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
 
-          {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto p-5 space-y-8">
             {/* PRICE */}
             <section>
               <h3 className="text-[10px] font-bold uppercase text-gray-400 mb-3 tracking-widest">Цена</h3>
               <div className="flex items-center gap-3">
-                <input 
-                  type="number" 
-                  inputMode="numeric"
-                  placeholder="От"
+                <input type="number" inputMode="numeric" placeholder="От"
                   value={draft.priceMin}
                   onChange={(e) => setDraft({...draft, priceMin: e.target.value})}
                   className="w-full bg-[#F5F5F5] rounded-2xl p-4 border-none text-black font-semibold placeholder-gray-400 focus:ring-2 focus:ring-blue-500"
                 />
-                <input 
-                  type="number" 
-                  inputMode="numeric"
-                  placeholder="До"
+                <input type="number" inputMode="numeric" placeholder="До"
                   value={draft.priceMax}
                   onChange={(e) => setDraft({...draft, priceMax: e.target.value})}
                   className="w-full bg-[#F5F5F5] rounded-2xl p-4 border-none text-black font-semibold placeholder-gray-400 focus:ring-2 focus:ring-blue-500"
                 />
-                <select 
-                  value={draft.currency}
+                <select value={draft.currency}
                   onChange={(e) => setDraft({...draft, currency: e.target.value as Currency})}
                   className="bg-[#F5F5F5] rounded-2xl p-4 border-none text-black font-bold focus:ring-2 focus:ring-blue-500"
                 >
@@ -244,17 +244,11 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
               <h3 className="text-[10px] font-bold uppercase text-gray-400 mb-3 tracking-widest">Комнаты</h3>
               <div className="flex flex-nowrap gap-1.5 overflow-x-auto no-scrollbar">
                 {['Studio', 1, 2, 3, '4+'].map((room) => (
-                  <button
-                    key={room}
-                    onClick={() => toggleRoom(room)}
+                  <button key={room} onClick={() => toggleRoom(room)}
                     className={`flex-1 min-w-0 py-4 px-2 rounded-2xl font-bold text-xs transition-all truncate ${
-                      draft.rooms.includes(room) 
-                        ? 'bg-blue-600 text-white shadow-lg' 
-                        : 'bg-[#F5F5F5] text-gray-600 active:bg-gray-200'
+                      draft.rooms.includes(room) ? 'bg-blue-600 text-white shadow-lg' : 'bg-[#F5F5F5] text-gray-600 active:bg-gray-200'
                     }`}
-                  >
-                    {room}
-                  </button>
+                  >{room}</button>
                 ))}
               </div>
             </section>
@@ -262,8 +256,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
             {/* DISTRICT */}
             <section>
               <h3 className="text-[10px] font-bold uppercase text-gray-400 mb-3 tracking-widest">Район</h3>
-              <button 
-                onClick={() => setActiveSheet('district')}
+              <button onClick={() => setActiveSheet('district')}
                 className="w-full bg-[#F5F5F5] p-4 rounded-2xl flex items-center justify-between active:bg-gray-200 transition-colors"
               >
                 <span className={`font-semibold ${draft.district.length > 0 ? 'text-black' : 'text-gray-400'}`}>
@@ -278,8 +271,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
             {/* METRO */}
             <section>
               <h3 className="text-[10px] font-bold uppercase text-gray-400 mb-3 tracking-widest">Метро</h3>
-              <button 
-                onClick={() => setActiveSheet('metro')}
+              <button onClick={() => setActiveSheet('metro')}
                 className="w-full bg-[#F5F5F5] p-4 rounded-2xl flex items-center justify-between active:bg-gray-200 transition-colors"
               >
                 <span className={`font-semibold ${draft.metro.length > 0 ? 'text-black' : 'text-gray-400'}`}>
@@ -294,23 +286,14 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
 
           {/* Footer */}
           <div className="p-5 bg-white border-t border-gray-100 flex flex-col items-center gap-4 flex-shrink-0">
-            <button 
-              onClick={applyFilters}
-              disabled={previewCount === 0}
+            <button onClick={applyFilters} disabled={previewCount === 0}
               className={`w-full font-bold py-5 rounded-2xl active:scale-[0.98] transition-all shadow-xl ${
-                previewCount === 0
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 text-white'
+                previewCount === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white'
               }`}
-            >
-              {buttonText}
-            </button>
-            <button 
-              onClick={resetDraft}
+            >{buttonText}</button>
+            <button onClick={resetDraft}
               className="text-gray-400 text-xs font-bold uppercase tracking-widest active:text-red-500 transition-colors"
-            >
-              Сбросить фильтры
-            </button>
+            >Сбросить фильтры</button>
           </div>
         </div>
       )}

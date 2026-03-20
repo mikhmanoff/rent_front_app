@@ -1,7 +1,4 @@
 // hooks/useListings.ts
-/**
- * Хук для загрузки объявлений с API
- */
 import { useState, useEffect, useCallback } from 'react';
 import { Listing, FilterState } from '../types';
 import { api, convertToListing, ListingsFilter } from '../api/client';
@@ -17,8 +14,6 @@ interface UseListingsResult {
 }
 
 export function useListings(filters: FilterState): UseListingsResult {
-  console.log('🚀 useListings initialized');  // ← добавь эту строку
-
   const [listings, setListings] = useState<Listing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,14 +21,12 @@ export function useListings(filters: FilterState): UseListingsResult {
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
 
-  // Convert FilterState to API filters
   const buildApiFilters = useCallback((): ListingsFilter => {
     const apiFilters: ListingsFilter = {
       page,
       page_size: 20,
     };
 
-    // Rooms
     if (filters.rooms.length > 0) {
       apiFilters.rooms = filters.rooms.map(r => {
         if (r === 'Studio') return 'studio';
@@ -42,40 +35,26 @@ export function useListings(filters: FilterState): UseListingsResult {
       }).join(',');
     }
 
-    // Price
-    if (filters.priceMin) {
-      apiFilters.price_min = parseInt(filters.priceMin);
-    }
-    if (filters.priceMax) {
-      apiFilters.price_max = parseInt(filters.priceMax);
-    }
+    if (filters.priceMin) apiFilters.price_min = parseInt(filters.priceMin);
+    if (filters.priceMax) apiFilters.price_max = parseInt(filters.priceMax);
 
-    // Currency
     apiFilters.currency = filters.currency.toLowerCase();
 
-    // District - convert string IDs to numeric
+    // District и metro теперь числовые ID из API
     if (filters.district.length > 0) {
-      // Фронт использует string id типа 'yunusabad', 
-      // нужно маппить на числовые ID из БД
-      // Пока передаём как есть, потом доработаем
       apiFilters.district = filters.district.join(',');
     }
 
-    // Metro
     if (filters.metro.length > 0) {
       apiFilters.metro = filters.metro.join(',');
     }
 
-    // Deal type - по умолчанию rent_long
     apiFilters.deal_type = 'rent_long';
 
     return apiFilters;
   }, [filters, page]);
 
-  // Load listings
   const loadListings = useCallback(async (reset: boolean = false) => {
-    console.log('🔄 loadListings called, reset:', reset);  // ← добавь
-
     try {
       setIsLoading(true);
       setError(null);
@@ -84,16 +63,11 @@ export function useListings(filters: FilterState): UseListingsResult {
       const apiFilters = buildApiFilters();
       apiFilters.page = currentPage;
 
-      console.log('📡 Fetching with filters:', apiFilters);  // ← добавь
-
       const response = await api.getListings(apiFilters);
 
-      console.log('✅ Got response:', response);  // ← добавь
-
-      
       const newListings = response.items
-      .filter(item => item.photos && item.photos.length > 0)
-      .map(convertToListing);
+        .filter(item => item.photos && item.photos.length > 0)
+        .map(convertToListing);
 
       if (reset) {
         setListings(newListings);
@@ -112,7 +86,6 @@ export function useListings(filters: FilterState): UseListingsResult {
     }
   }, [buildApiFilters, page]);
 
-  // Initial load and filter changes
   useEffect(() => {
     setPage(1);
     loadListings(true);
@@ -125,7 +98,6 @@ export function useListings(filters: FilterState): UseListingsResult {
     filters.metro.join(','),
   ]);
 
-  // Load more
   const loadMore = useCallback(() => {
     if (!isLoading && hasMore) {
       setPage(prev => prev + 1);
@@ -133,24 +105,14 @@ export function useListings(filters: FilterState): UseListingsResult {
     }
   }, [isLoading, hasMore, loadListings]);
 
-  // Refresh
   const refresh = useCallback(() => {
     setPage(1);
     loadListings(true);
   }, [loadListings]);
 
-  return {
-    listings,
-    isLoading,
-    error,
-    total,
-    hasMore,
-    loadMore,
-    refresh,
-  };
+  return { listings, isLoading, error, total, hasMore, loadMore, refresh };
 }
 
-// Хук для загрузки справочников
 export function useReferenceData() {
   const [districts, setDistricts] = useState<{ id: string; name: string }[]>([]);
   const [metroStations, setMetroStations] = useState<{ id: string; name: string }[]>([]);
@@ -163,23 +125,14 @@ export function useReferenceData() {
           api.getDistricts(),
           api.getMetroStations(),
         ]);
-
-        setDistricts(districtsData.map(d => ({
-          id: d.id.toString(),
-          name: d.name_ru,
-        })));
-
-        setMetroStations(metroData.map(m => ({
-          id: m.id.toString(),
-          name: m.name_ru,
-        })));
+        setDistricts(districtsData.map(d => ({ id: d.id.toString(), name: d.name_ru })));
+        setMetroStations(metroData.map(m => ({ id: m.id.toString(), name: m.name_ru })));
       } catch (err) {
         console.error('Failed to load reference data:', err);
       } finally {
         setIsLoading(false);
       }
     }
-
     load();
   }, []);
 
