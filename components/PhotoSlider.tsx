@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, memo } from 'react';
 
 const PLACEHOLDER_PHOTO = 'https://via.placeholder.com/800x600?text=Нет+фото';
 
@@ -6,23 +6,24 @@ interface PhotoSliderProps {
   photos: string[];
   initialIndex?: number;
   onIndexChange?: (index: number) => void;
-  onPhotoClick?: () => void;
 }
 
-const PhotoSlider: React.FC<PhotoSliderProps> = ({ 
+const PhotoSlider: React.FC<PhotoSliderProps> = memo(({ 
   photos, 
   initialIndex = 0, 
   onIndexChange,
-  onPhotoClick 
 }) => {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastSyncedIndex = useRef(initialIndex);
 
   // Sync when initialIndex changes from outside (e.g. returning from gallery)
   useEffect(() => {
-    if (scrollRef.current) {
+    if (initialIndex !== lastSyncedIndex.current && scrollRef.current) {
+      lastSyncedIndex.current = initialIndex;
       const width = scrollRef.current.offsetWidth;
-      scrollRef.current.scrollLeft = width * initialIndex;
+      // Use instant scroll — no animation, no flicker
+      scrollRef.current.scrollTo({ left: width * initialIndex, behavior: 'instant' as ScrollBehavior });
       setActiveIndex(initialIndex);
     }
   }, [initialIndex]);
@@ -30,9 +31,11 @@ const PhotoSlider: React.FC<PhotoSliderProps> = ({
   const handleScroll = () => {
     if (scrollRef.current) {
       const width = scrollRef.current.offsetWidth;
+      if (width === 0) return;
       const index = Math.round(scrollRef.current.scrollLeft / width);
       if (index !== activeIndex && index >= 0 && index < photos.length) {
         setActiveIndex(index);
+        lastSyncedIndex.current = index;
         onIndexChange?.(index);
         window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light');
       }
@@ -47,19 +50,25 @@ const PhotoSlider: React.FC<PhotoSliderProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full group" onClick={onPhotoClick}>
+    <div 
+      className="relative w-full h-full"
+      style={{ contain: 'layout style paint' }}
+    >
       <div 
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex overflow-x-auto snap-x snap-mandatory h-full no-scrollbar overscroll-x-contain"
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        className="flex overflow-x-auto snap-x snap-mandatory h-full no-scrollbar"
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehaviorX: 'contain',
+        }}
       >
         {photos.map((photo, i) => (
           <div key={i} className="w-full h-full flex-shrink-0 snap-center">
             <img 
               src={photo} 
               alt={`Photo ${i + 1}`} 
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover pointer-events-none"
               loading="lazy"
               draggable={false}
               onError={handleImageError}
@@ -76,21 +85,23 @@ const PhotoSlider: React.FC<PhotoSliderProps> = ({
       )}
 
       {/* Pagination bars */}
-      <div className="absolute bottom-4 left-0 right-0 flex flex-col items-center gap-2 z-10 pointer-events-none px-6">
-         <div className="flex justify-center gap-1 w-full">
-           {photos.map((_, i) => (
+      {photos.length > 1 && (
+        <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1 z-10 pointer-events-none px-6">
+          {photos.map((_, i) => (
             <div 
               key={i} 
-              className={`h-1 flex-1 rounded-full transition-all duration-300 ${
-                i === activeIndex ? 'bg-white shadow-sm scale-y-110' : 'bg-white/30'
+              className={`h-1 flex-1 rounded-full transition-colors duration-200 ${
+                i === activeIndex ? 'bg-white' : 'bg-white/30'
               }`}
               style={{ maxWidth: '40px' }}
             />
           ))}
-         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
-};
+});
+
+PhotoSlider.displayName = 'PhotoSlider';
 
 export default PhotoSlider;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Listing } from '../types';
 import PhotoSlider from './PhotoSlider';
 import ActionButtons from './ActionButtons';
@@ -41,15 +41,35 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [showFullscreen, setShowFullscreen] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  
+  // Track touch to distinguish tap from swipe on photo area
+  const photoTouchStart = useRef<{ x: number; y: number; time: number } | null>(null);
 
   const handleFavClick = () => {
     onToggleFavorite(listing.id);
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('medium');
   };
 
-  // Open gallery at current photo
-  const openGallery = () => {
-    setShowFullscreen(true);
+  // Photo area touch handlers — open gallery only on TAP (not swipe)
+  const onPhotoTouchStart = (e: React.TouchEvent) => {
+    photoTouchStart.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+      time: Date.now(),
+    };
+  };
+
+  const onPhotoTouchEnd = (e: React.TouchEvent) => {
+    if (!photoTouchStart.current) return;
+    const dx = Math.abs(e.changedTouches[0].clientX - photoTouchStart.current.x);
+    const dy = Math.abs(e.changedTouches[0].clientY - photoTouchStart.current.y);
+    const dt = Date.now() - photoTouchStart.current.time;
+    
+    // It's a tap: small movement, short duration
+    if (dx < 10 && dy < 10 && dt < 300) {
+      setShowFullscreen(true);
+    }
+    photoTouchStart.current = null;
   };
 
   // Close gallery and sync index back to slider
@@ -67,11 +87,15 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
   if (listing.conditioner) tags.push('Кондиционер');
 
   return (
-    <div className="relative w-full h-[100dvh] flex flex-col bg-white overflow-hidden">
+    <div 
+      className="relative w-full h-[100dvh] flex flex-col bg-white"
+      style={{ contain: 'layout style', overflow: 'hidden' }}
+    >
       {/* Photo — fills available space */}
       <div 
-        className="relative w-full flex-1 cursor-pointer min-h-0"
-        onClick={openGallery}
+        className="relative w-full flex-1 min-h-0"
+        onTouchStart={onPhotoTouchStart}
+        onTouchEnd={onPhotoTouchEnd}
       >
         <PhotoSlider 
           photos={listing.photos} 
