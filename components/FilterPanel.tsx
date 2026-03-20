@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FilterState, Currency } from '../types';
 import MultiSelectBottomSheet from './MultiSelectBottomSheet';
 
@@ -58,23 +58,91 @@ function countActiveFilters(f: FilterState): number {
   return count;
 }
 
+// Собирает query params из черновика фильтров
+function buildPreviewParams(draft: FilterState): string {
+  const params = new URLSearchParams();
+  params.set('deal_type', 'rent_long');
+  params.set('page', '1');
+  params.set('page_size', '1'); // нам нужен только total
+
+  if (draft.rooms.length > 0) {
+    const mapped = draft.rooms.map(r => {
+      if (r === 'Studio') return 'studio';
+      if (r === '4+') return '4';
+      return String(r);
+    });
+    params.set('rooms', mapped.join(','));
+  }
+  if (draft.priceMin) params.set('price_min', draft.priceMin);
+  if (draft.priceMax) params.set('price_max', draft.priceMax);
+  params.set('currency', draft.currency.toLowerCase());
+  if (draft.district.length > 0) params.set('district', draft.district.join(','));
+  if (draft.metro.length > 0) params.set('metro', draft.metro.join(','));
+
+  return params.toString();
+}
+
 const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, isOpen, setIsOpen }) => {
   const [draft, setDraft] = useState<FilterState>(filters);
   const [activeSheet, setActiveSheet] = useState<'district' | 'metro' | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      setDraft({ ...filters });
-    }
-  }, [isOpen]);
+  const [previewCount, setPreviewCount] = useState<number | null>(null);
+  const [isLoadingCount, setIsLoadingCount] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeCount = countActiveFilters(filters);
 
+  // Синхронизируем черновик при открытии
+  useEffect(() => {
+    if (isOpen) {
+      setDraft({ ...filters });
+      setPreviewCount(count); // начинаем с текущего count
+    }
+  }, [isOpen]);
+
+  // Запрашиваем preview count при изменении черновика (с debounce)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Debounce 400ms
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchPreviewCount(draft);
+    }, 400);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [
+    draft.rooms.join(','),
+    draft.priceMin,
+    draft.priceMax,
+    draft.currency,
+    draft.district.join(','),
+    draft.metro.join(','),
+    isOpen,
+  ]);
+
+  const fetchPreviewCount = async (d: FilterState) => {
+    setIsLoadingCount(true);
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+      const query = buildPreviewParams(d);
+      const resp = await fetch(`${API_BASE}/api/listings?${query}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setPreviewCount(data.total ?? 0);
+      }
+    } catch (err) {
+      console.error('Preview count error:', err);
+    } finally {
+      setIsLoadingCount(false);
+    }
+  };
+
   const toggleRoom = (value: any) => {
-    const currentValues = draft.rooms;
-    const nextValues = currentValues.includes(value)
-      ? currentValues.filter(v => v !== value)
-      : [...currentValues, value];
+    const nextValues = draft.rooms.includes(value)
+      ? draft.rooms.filter(v => v !== value)
+      : [...draft.rooms, value];
     setDraft({ ...draft, rooms: nextValues });
   };
 
@@ -82,11 +150,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
     const list = type === 'district' ? districts : metroStations;
     const selectedIds = draft[type];
     if (selectedIds.length === 0) return type === 'district' ? 'Любой район' : 'Любое метро';
-    
-    const selectedNames = list
-      .filter(item => selectedIds.includes(item.id))
-      .map(item => item.name);
-    
+    const selectedNames = list.filter(item => selectedIds.includes(item.id)).map(item => item.name);
     if (selectedNames.length <= 1) return selectedNames[0];
     return `${selectedNames[0]} +${selectedNames.length - 1}`;
   };
@@ -98,18 +162,25 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
   const applyFilters = () => {
     setFilters({ ...draft });
     setIsOpen(false);
-    if (window.Telegram?.WebApp?.HapticFeedback) {
-      window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
-    }
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('medium');
   };
 
   const closeWithoutApply = () => {
     setIsOpen(false);
   };
 
+  // Текст кнопки
+  const buttonText = isLoadingCount
+    ? 'Считаем...'
+    : previewCount !== null && previewCount > 0
+      ? `Показать ${previewCount} вариантов`
+      : previewCount === 0
+        ? 'Ничего не найдено'
+        : 'Применить фильтры';
+
   return (
     <>
-      {/* Filter button with badge */}
+      {/* Filter button */}
       <button 
         onClick={() => setIsOpen(true)}
         className="fixed top-4 left-4 z-40 bg-black/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center justify-center text-white text-[13px] font-bold tracking-tight active:scale-95 transition-transform"
@@ -122,7 +193,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
         )}
       </button>
 
-      {/* Full-screen filter panel — z-[200] to cover EVERYTHING */}
+      {/* Full-screen filter panel */}
       {isOpen && (
         <div className="fixed inset-0 z-[200] bg-white flex flex-col animate-slide-in-up">
           {/* Header */}
@@ -221,13 +292,18 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
             </section>
           </div>
 
-          {/* Footer — inside panel flow, not separate fixed */}
+          {/* Footer */}
           <div className="p-5 bg-white border-t border-gray-100 flex flex-col items-center gap-4 flex-shrink-0">
             <button 
               onClick={applyFilters}
-              className="w-full bg-blue-600 text-white font-bold py-5 rounded-2xl active:scale-[0.98] transition-all shadow-xl"
+              disabled={previewCount === 0}
+              className={`w-full font-bold py-5 rounded-2xl active:scale-[0.98] transition-all shadow-xl ${
+                previewCount === 0
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-blue-600 text-white'
+              }`}
             >
-              Применить фильтры{count > 0 ? ` · ${count}` : ''}
+              {buttonText}
             </button>
             <button 
               onClick={resetDraft}
