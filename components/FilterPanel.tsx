@@ -49,19 +49,6 @@ const DEFAULT_FILTERS: FilterState = {
   petsAllowed: null,
 };
 
-// Проверяет, отличается ли черновик от применённых фильтров
-function hasChanges(draft: FilterState, applied: FilterState): boolean {
-  return (
-    draft.priceMin !== applied.priceMin ||
-    draft.priceMax !== applied.priceMax ||
-    draft.currency !== applied.currency ||
-    draft.rooms.join(',') !== applied.rooms.join(',') ||
-    draft.district.join(',') !== applied.district.join(',') ||
-    draft.metro.join(',') !== applied.metro.join(',')
-  );
-}
-
-// Считает количество активных фильтров
 function countActiveFilters(f: FilterState): number {
   let count = 0;
   if (f.priceMin || f.priceMax) count++;
@@ -72,18 +59,15 @@ function countActiveFilters(f: FilterState): number {
 }
 
 const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, isOpen, setIsOpen }) => {
-  // Черновик фильтров — редактируется внутри панели
   const [draft, setDraft] = useState<FilterState>(filters);
   const [activeSheet, setActiveSheet] = useState<'district' | 'metro' | null>(null);
 
-  // Синхронизируем черновик при открытии панели
   useEffect(() => {
     if (isOpen) {
       setDraft({ ...filters });
     }
   }, [isOpen]);
 
-  const changed = hasChanges(draft, filters);
   const activeCount = countActiveFilters(filters);
 
   const toggleRoom = (value: any) => {
@@ -120,13 +104,12 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
   };
 
   const closeWithoutApply = () => {
-    // Закрываем без сохранения — черновик сбросится при следующем открытии
     setIsOpen(false);
   };
 
   return (
     <>
-      {/* Filter button with active count badge */}
+      {/* Filter button with badge */}
       <button 
         onClick={() => setIsOpen(true)}
         className="fixed top-4 left-4 z-40 bg-black/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center justify-center text-white text-[13px] font-bold tracking-tight active:scale-95 transition-transform"
@@ -139,9 +122,11 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
         )}
       </button>
 
+      {/* Full-screen filter panel — z-[200] to cover EVERYTHING */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 bg-white flex flex-col animate-slide-in-up">
-          <div className="flex items-center justify-between p-5 border-b border-gray-100">
+        <div className="fixed inset-0 z-[200] bg-white flex flex-col animate-slide-in-up">
+          {/* Header */}
+          <div className="flex items-center justify-between p-5 border-b border-gray-100 flex-shrink-0">
             <h2 className="text-xl font-bold">Фильтры</h2>
             <button onClick={closeWithoutApply} className="p-2 text-black">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -150,7 +135,8 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-5 space-y-8 pb-40">
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-8">
             {/* PRICE */}
             <section>
               <h3 className="text-[10px] font-bold uppercase text-gray-400 mb-3 tracking-widest">Цена</h3>
@@ -235,17 +221,13 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
             </section>
           </div>
 
-          {/* Footer Controls */}
-          <div className="fixed bottom-0 inset-x-0 p-5 bg-white border-t border-gray-100 flex flex-col items-center gap-4">
+          {/* Footer — inside panel flow, not separate fixed */}
+          <div className="p-5 bg-white border-t border-gray-100 flex flex-col items-center gap-4 flex-shrink-0">
             <button 
               onClick={applyFilters}
-              className={`w-full font-bold py-5 rounded-2xl active:scale-[0.98] transition-all shadow-xl ${
-                changed 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-blue-600 text-white'
-              }`}
+              className="w-full bg-blue-600 text-white font-bold py-5 rounded-2xl active:scale-[0.98] transition-all shadow-xl"
             >
-              Применить фильтры{count > 0 ? ` · ${count} объектов` : ''}
+              Применить фильтры{count > 0 ? ` · ${count}` : ''}
             </button>
             <button 
               onClick={resetDraft}
@@ -257,7 +239,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
         </div>
       )}
 
-      {/* District Selector Bottom Sheet */}
+      {/* District Selector */}
       <MultiSelectBottomSheet 
         title="Выберите район"
         options={districts}
@@ -267,7 +249,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, count, i
         onChange={(ids) => setDraft({ ...draft, district: ids })}
       />
 
-      {/* Metro Selector Bottom Sheet */}
+      {/* Metro Selector */}
       <MultiSelectBottomSheet 
         title="Выберите метро"
         options={metroStations}
