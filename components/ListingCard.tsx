@@ -50,7 +50,6 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
   const shareDescription = buildShareDescription(listing);
   const price = formatPrice(listing.pricePerMonth, listing.currency);
 
-  // Собираем теги
   const tags: string[] = [];
   if (listing.furniture) tags.push('Мебель');
   if (listing.renovation) tags.push('Ремонт');
@@ -58,10 +57,9 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
 
   return (
     <div className="relative w-full h-[100dvh] snap-start flex flex-col bg-white overflow-hidden">
-      {/* Photo — 50% экрана */}
+      {/* Photo — занимает всё доступное пространство */}
       <div 
-        className="relative w-full flex-shrink-0 cursor-pointer"
-        style={{ height: '50dvh' }}
+        className="relative w-full flex-1 cursor-pointer min-h-0"
         onClick={() => setShowFullscreen(true)}
       >
         <PhotoSlider 
@@ -71,9 +69,9 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
         />
       </div>
 
-      {/* Info Block — компактный */}
-      <div className="flex-1 flex flex-col px-4 pt-2 pb-1 bg-white overflow-hidden">
-        {/* Price + Rooms + Area — одна строка */}
+      {/* Info Block — компактный, фиксированная высота */}
+      <div className="flex-shrink-0 px-4 pt-2 pb-1 bg-white">
+        {/* Price + Rooms + Area */}
         <div className="flex items-baseline justify-between mb-1">
           <div className="flex items-baseline gap-1">
             <span className="text-[26px] font-bold text-black tracking-tight leading-none">
@@ -90,19 +88,18 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
           </div>
         </div>
 
-        {/* Location + Fav + Details — одна строка */}
+        {/* Location + Подробнее + Fav */}
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1 text-[14px] font-medium text-gray-500 truncate flex-1 pr-2">
             <span className="text-xs">📍</span>
             <span className="truncate">{listing.address}</span>
           </div>
-          
           <div className="flex items-center gap-2 flex-shrink-0">
             <button 
               onClick={() => setIsDetailsOpen(true)}
               className="text-blue-500 text-[11px] font-bold uppercase tracking-wider"
             >
-              Ещё →
+              Подробнее →
             </button>
             <button 
               onClick={handleFavClick}
@@ -110,7 +107,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
             >
               <svg 
                 xmlns="http://www.w3.org/2000/svg" 
-                className={`h-4.5 w-4.5 transition-colors ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-300'}`} 
+                className={`h-4 w-4 transition-colors ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-300'}`} 
                 viewBox="0 0 24 24" 
                 stroke="currentColor" 
                 strokeWidth={1.5}
@@ -121,14 +118,13 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
           </div>
         </div>
 
-        {/* Tags + Stats — одна строка */}
-        <div className="flex items-center justify-between mb-1">
+        {/* Tags + Published date */}
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
             {tags.length > 0 ? tags.join(' · ') : ''}
           </div>
-          <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-            <span>🔥 {listing.viewsToday}</span>
-            <span>🕐 {formatPublishedDate(listing.publishedAt)}</span>
+          <div className="text-[10px] font-medium text-gray-400">
+            Опубликовано {formatPublishedDate(listing.publishedAt)}
           </div>
         </div>
       </div>
