@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Listing } from '../types';
 import PhotoSlider from './PhotoSlider';
 import ActionButtons from './ActionButtons';
@@ -8,6 +8,7 @@ interface ListingCardProps {
   listing: Listing;
   isFavorite: boolean;
   onToggleFavorite: (id: number) => void;
+  onGalleryChange?: (isOpen: boolean) => void;
 }
 
 function formatPublishedDate(dateString: string): string {
@@ -37,20 +38,23 @@ function buildShareDescription(listing: Listing): string {
   return parts.join('\n');
 }
 
-const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggleFavorite }) => {
+const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggleFavorite, onGalleryChange }) => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [showFullscreen, setShowFullscreen] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   
-  // Track touch to distinguish tap from swipe on photo area
   const photoTouchStart = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  // Notify parent when gallery opens/closes
+  useEffect(() => {
+    onGalleryChange?.(showFullscreen);
+  }, [showFullscreen, onGalleryChange]);
 
   const handleFavClick = () => {
     onToggleFavorite(listing.id);
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('medium');
   };
 
-  // Photo area touch handlers — open gallery only on TAP (not swipe)
   const onPhotoTouchStart = (e: React.TouchEvent) => {
     photoTouchStart.current = {
       x: e.touches[0].clientX,
@@ -65,14 +69,12 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
     const dy = Math.abs(e.changedTouches[0].clientY - photoTouchStart.current.y);
     const dt = Date.now() - photoTouchStart.current.time;
     
-    // It's a tap: small movement, short duration
     if (dx < 10 && dy < 10 && dt < 300) {
       setShowFullscreen(true);
     }
     photoTouchStart.current = null;
   };
 
-  // Close gallery and sync index back to slider
   const closeGallery = (lastIndex: number) => {
     setCurrentPhotoIndex(lastIndex);
     setShowFullscreen(false);
@@ -91,7 +93,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
       className="relative w-full h-[100dvh] flex flex-col bg-white"
       style={{ contain: 'layout style', overflow: 'hidden' }}
     >
-      {/* Photo — fills available space */}
+      {/* Photo */}
       <div 
         className="relative w-full flex-1 min-h-0"
         onTouchStart={onPhotoTouchStart}
@@ -106,7 +108,6 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
 
       {/* Info Block */}
       <div className="flex-shrink-0 px-4 pt-2 pb-1 bg-white">
-        {/* Price + Stats */}
         <div className="flex items-baseline justify-between mb-1">
           <div className="flex items-baseline gap-1">
             <span className="text-[26px] font-bold text-black tracking-tight leading-none">{price}</span>
@@ -121,7 +122,6 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
           </div>
         </div>
 
-        {/* Location + Details + Fav */}
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1 text-[14px] font-medium text-gray-500 truncate flex-1 pr-2">
             <span className="text-xs">📍</span>
@@ -144,7 +144,6 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
           </div>
         </div>
 
-        {/* Tags + Date */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
             {tags.length > 0 ? tags.join(' · ') : ''}
@@ -165,7 +164,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
         </div>
       )}
 
-      {/* Fullscreen Gallery — synced */}
+      {/* Fullscreen Gallery */}
       {showFullscreen && (
         <FullscreenGallery 
           photos={listing.photos}

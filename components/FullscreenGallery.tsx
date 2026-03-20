@@ -13,7 +13,6 @@ const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({ photos, initialIn
   const currentIndexRef = useRef(initialIndex);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Use transform-based navigation (not scrollLeft which fails on mount)
   const [isAnimating, setIsAnimating] = useState(false);
   const touchStartX = useRef(0);
   const touchDeltaX = useRef(0);
@@ -43,6 +42,7 @@ const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({ photos, initialIn
   }, [photos.length]);
 
   const onTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation(); // Block Feed from catching this
     if (isAnimating) return;
     touchStartX.current = e.touches[0].clientX;
     touchDeltaX.current = 0;
@@ -50,13 +50,15 @@ const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({ photos, initialIn
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
+    e.stopPropagation(); // Block Feed vertical swipe
     if (!isDragging.current) return;
     const delta = e.touches[0].clientX - touchStartX.current;
     touchDeltaX.current = delta;
     setDragOffset(delta);
   };
 
-  const onTouchEnd = () => {
+  const onTouchEnd = (e: React.TouchEvent) => {
+    e.stopPropagation(); // Block Feed from catching this
     if (!isDragging.current) return;
     isDragging.current = false;
     const threshold = window.innerWidth * 0.2;
@@ -66,14 +68,16 @@ const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({ photos, initialIn
     } else if (touchDeltaX.current > threshold && currentIndex > 0) {
       goTo(currentIndex - 1);
     } else {
-      // Snap back
       setIsAnimating(true);
       setDragOffset(0);
       setTimeout(() => setIsAnimating(false), 300);
     }
   };
 
-  const handleClose = () => onClose(currentIndexRef.current);
+  const handleClose = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    onClose(currentIndexRef.current);
+  };
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.target as HTMLImageElement;
@@ -82,35 +86,38 @@ const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({ photos, initialIn
     }
   };
 
-  // Calculate transform: base position + drag offset
   const translateX = -(currentIndex * 100) + (dragOffset / (window.innerWidth || 1)) * 100;
 
   return (
-    <div className="fixed inset-0 bg-black z-[200] flex flex-col" style={{ touchAction: 'none' }}>
+    <div 
+      className="fixed inset-0 bg-black z-[300] flex flex-col"
+      style={{ touchAction: 'none' }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-[201]">
-        <button 
-          onClick={(e) => { e.stopPropagation(); handleClose(); }}
-          className="flex items-center gap-2 bg-white/15 rounded-full pl-3 pr-4 py-2 text-white backdrop-blur-md active:scale-90 transition-transform"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-          </svg>
-          <span className="text-sm font-semibold">Назад</span>
-        </button>
-
+      <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-[301]">
+        {/* Counter — left */}
         <div className="bg-black/50 text-white text-sm font-bold px-3 py-1.5 rounded-full backdrop-blur-sm">
           {currentIndex + 1} / {photos.length}
         </div>
+
+        {/* Close X button — right */}
+        <button 
+          onClick={handleClose}
+          className="w-10 h-10 bg-white/15 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 transition-transform"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
-      {/* Image strip — transform based, not scroll based */}
+      {/* Image strip */}
       <div 
         ref={containerRef}
         className="flex-1 flex items-center overflow-hidden"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
       >
         <div 
           className="flex h-full"

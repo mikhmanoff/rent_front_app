@@ -34,12 +34,13 @@ const Feed: React.FC<FeedProps> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
   // Touch tracking
   const touchStartY = useRef(0);
   const touchMoved = useRef(false);
 
-  // Total slides count (listings + loading/endscreen)
+  // Total slides count
   const totalSlides = listings.length + (!hasMore && listings.length > 0 ? 1 : 0) + (isLoading && listings.length > 0 ? 1 : 0);
 
   // Load favorites
@@ -73,7 +74,7 @@ const Feed: React.FC<FeedProps> = ({
   };
 
   const goTo = useCallback((index: number) => {
-    if (isAnimating) return;
+    if (isAnimating || isGalleryOpen) return; // Block when gallery is open
     const maxIndex = totalSlides - 1;
     const next = Math.max(0, Math.min(index, maxIndex));
     if (next === currentIndex) return;
@@ -84,29 +85,34 @@ const Feed: React.FC<FeedProps> = ({
 
     setTimeout(() => {
       setIsAnimating(false);
-      // Preload more
       if (next >= listings.length - 3 && hasMore && !isLoading) loadMore();
     }, ANIMATION_MS);
-  }, [isAnimating, currentIndex, totalSlides, listings.length, hasMore, isLoading, loadMore]);
+  }, [isAnimating, isGalleryOpen, currentIndex, totalSlides, listings.length, hasMore, isLoading, loadMore]);
 
-  // Touch events — only vertical, strict 1 card
+  // Touch events — block when gallery open
   const onTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isGalleryOpen) return;
     touchStartY.current = e.touches[0].clientY;
     touchMoved.current = false;
-  }, []);
+  }, [isGalleryOpen]);
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
-    // Mark that finger moved (to distinguish from tap)
+    if (isGalleryOpen) return;
     const diff = Math.abs(e.touches[0].clientY - touchStartY.current);
     if (diff > 10) touchMoved.current = true;
-  }, []);
+  }, [isGalleryOpen]);
 
   const onTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (!touchMoved.current) return; // was a tap, not swipe
+    if (isGalleryOpen) return;
+    if (!touchMoved.current) return;
     const diff = touchStartY.current - e.changedTouches[0].clientY;
-    if (diff > SWIPE_THRESHOLD) goTo(currentIndex + 1);      // swipe up
-    else if (diff < -SWIPE_THRESHOLD) goTo(currentIndex - 1); // swipe down
-  }, [currentIndex, goTo]);
+    if (diff > SWIPE_THRESHOLD) goTo(currentIndex + 1);
+    else if (diff < -SWIPE_THRESHOLD) goTo(currentIndex - 1);
+  }, [isGalleryOpen, currentIndex, goTo]);
+
+  const handleGalleryChange = useCallback((isOpen: boolean) => {
+    setIsGalleryOpen(isOpen);
+  }, []);
 
   const handleRestart = () => {
     setCurrentIndex(0);
@@ -148,20 +154,25 @@ const Feed: React.FC<FeedProps> = ({
 
   return (
     <div className="relative w-full h-[100dvh] bg-white overflow-hidden">
-      <FilterPanel filters={filters} setFilters={setFilters} count={total} isOpen={isFilterOpen} setIsOpen={setIsFilterOpen} />
+      {/* Filter + Favorites buttons — HIDDEN when gallery is open */}
+      {!isGalleryOpen && (
+        <>
+          <FilterPanel filters={filters} setFilters={setFilters} count={total} isOpen={isFilterOpen} setIsOpen={setIsFilterOpen} />
 
-      <button onClick={onOpenFavorites}
-        className="fixed top-4 right-4 z-40 bg-black/20 backdrop-blur-md w-10 h-10 rounded-full border border-white/10 flex items-center justify-center active:scale-95 transition-transform"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-        </svg>
-        {favorites.length > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-            {favorites.length > 99 ? '99' : favorites.length}
-          </span>
-        )}
-      </button>
+          <button onClick={onOpenFavorites}
+            className="fixed top-4 right-4 z-40 bg-black/20 backdrop-blur-md w-10 h-10 rounded-full border border-white/10 flex items-center justify-center active:scale-95 transition-transform"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+            {favorites.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                {favorites.length > 99 ? '99' : favorites.length}
+              </span>
+            )}
+          </button>
+        </>
+      )}
       
       {/* Feed — CSS transform, no native scroll */}
       <div 
@@ -169,7 +180,7 @@ const Feed: React.FC<FeedProps> = ({
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        style={{ touchAction: 'pan-x' }}  
+        style={{ touchAction: isGalleryOpen ? 'none' : 'pan-x' }}  
       >
         {listings.length > 0 ? (
           <div style={{
@@ -182,6 +193,7 @@ const Feed: React.FC<FeedProps> = ({
                 key={listing.id} listing={listing} 
                 isFavorite={favorites.includes(listing.id)}
                 onToggleFavorite={toggleFavorite}
+                onGalleryChange={handleGalleryChange}
               />
             ))}
             
