@@ -18,6 +18,7 @@ const PhotoSlider: React.FC<PhotoSliderProps> = ({
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Sync when initialIndex changes from outside (e.g. returning from gallery)
   useEffect(() => {
     if (scrollRef.current) {
       const width = scrollRef.current.offsetWidth;
@@ -67,6 +68,13 @@ const PhotoSlider: React.FC<PhotoSliderProps> = ({
         ))}
       </div>
       
+      {/* Photo counter badge */}
+      {photos.length > 1 && (
+        <div className="absolute top-4 right-4 bg-black/50 text-white text-xs font-bold px-2.5 py-1 rounded-full backdrop-blur-sm z-10 pointer-events-none">
+          {activeIndex + 1} / {photos.length}
+        </div>
+      )}
+
       {/* Pagination bars */}
       <div className="absolute bottom-4 left-0 right-0 flex flex-col items-center gap-2 z-10 pointer-events-none px-6">
          <div className="flex justify-center gap-1 w-full">

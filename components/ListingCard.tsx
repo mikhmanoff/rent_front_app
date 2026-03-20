@@ -47,6 +47,17 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('medium');
   };
 
+  // Open gallery at current photo
+  const openGallery = () => {
+    setShowFullscreen(true);
+  };
+
+  // Close gallery and sync index back to slider
+  const closeGallery = (lastIndex: number) => {
+    setCurrentPhotoIndex(lastIndex);
+    setShowFullscreen(false);
+  };
+
   const shareDescription = buildShareDescription(listing);
   const price = formatPrice(listing.pricePerMonth, listing.currency);
 
@@ -56,11 +67,11 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
   if (listing.conditioner) tags.push('Кондиционер');
 
   return (
-    <div className="relative w-full h-[100dvh] snap-start flex flex-col bg-white overflow-hidden">
-      {/* Photo — занимает всё доступное пространство */}
+    <div className="relative w-full h-[100dvh] flex flex-col bg-white overflow-hidden">
+      {/* Photo — fills available space */}
       <div 
         className="relative w-full flex-1 cursor-pointer min-h-0"
-        onClick={() => setShowFullscreen(true)}
+        onClick={openGallery}
       >
         <PhotoSlider 
           photos={listing.photos} 
@@ -69,14 +80,12 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
         />
       </div>
 
-      {/* Info Block — компактный, фиксированная высота */}
+      {/* Info Block */}
       <div className="flex-shrink-0 px-4 pt-2 pb-1 bg-white">
-        {/* Price + Rooms + Area */}
+        {/* Price + Stats */}
         <div className="flex items-baseline justify-between mb-1">
           <div className="flex items-baseline gap-1">
-            <span className="text-[26px] font-bold text-black tracking-tight leading-none">
-              {price}
-            </span>
+            <span className="text-[26px] font-bold text-black tracking-tight leading-none">{price}</span>
             <span className="text-sm font-medium text-black/60">/мес</span>
           </div>
           <div className="flex items-center gap-1.5 text-[13px] font-semibold text-gray-500">
@@ -88,29 +97,22 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
           </div>
         </div>
 
-        {/* Location + Подробнее + Fav */}
+        {/* Location + Details + Fav */}
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1 text-[14px] font-medium text-gray-500 truncate flex-1 pr-2">
             <span className="text-xs">📍</span>
             <span className="truncate">{listing.address}</span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button 
-              onClick={() => setIsDetailsOpen(true)}
+            <button onClick={() => setIsDetailsOpen(true)}
               className="text-blue-500 text-[11px] font-bold uppercase tracking-wider"
-            >
-              Подробнее →
-            </button>
-            <button 
-              onClick={handleFavClick}
+            >Подробнее →</button>
+            <button onClick={handleFavClick}
               className="w-9 h-9 bg-white border border-gray-100 rounded-xl shadow-sm flex items-center justify-center transition-transform active:scale-90"
             >
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
+              <svg xmlns="http://www.w3.org/2000/svg" 
                 className={`h-4 w-4 transition-colors ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-300'}`} 
-                viewBox="0 0 24 24" 
-                stroke="currentColor" 
-                strokeWidth={1.5}
+                viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
@@ -118,7 +120,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
           </div>
         </div>
 
-        {/* Tags + Published date */}
+        {/* Tags + Date */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
             {tags.length > 0 ? tags.join(' · ') : ''}
@@ -133,53 +135,42 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
       {!showFullscreen && (
         <div className="px-4 pb-3 pt-1 bg-white z-[102] border-t border-gray-50 flex-shrink-0">
           <ActionButtons 
-            id={listing.id} 
-            phone={listing.ownerPhone} 
-            telegram={listing.ownerTelegram}
+            id={listing.id} phone={listing.ownerPhone} telegram={listing.ownerTelegram}
             shareDescription={shareDescription}
           />
         </div>
       )}
 
-      {/* Fullscreen Gallery */}
+      {/* Fullscreen Gallery — synced */}
       {showFullscreen && (
         <FullscreenGallery 
           photos={listing.photos}
           initialIndex={currentPhotoIndex}
-          onClose={() => setShowFullscreen(false)}
+          onClose={closeGallery}
         />
       )}
 
       {/* Details Bottom Sheet */}
       {isDetailsOpen && (
         <>
-          <div 
-            className="fixed inset-0 bg-black/50 z-[100] animate-fade-in"
-            onClick={() => setIsDetailsOpen(false)}
-          />
+          <div className="fixed inset-0 bg-black/50 z-[100] animate-fade-in" onClick={() => setIsDetailsOpen(false)} />
           <div className="fixed inset-x-0 bottom-0 h-[80vh] bg-white rounded-t-[20px] z-[101] flex flex-col animate-slide-in-up shadow-2xl overflow-hidden">
             <div className="flex justify-center pt-4 pb-2" onClick={() => setIsDetailsOpen(false)}>
               <div className="w-10 h-1 bg-gray-200 rounded-full" />
             </div>
             <div className="flex-1 overflow-y-auto px-5 py-2 pb-[60px] no-scrollbar">
-              <div className="mb-4 text-sm text-gray-400">
-                Опубликовано: {formatPublishedDate(listing.publishedAt)}
-              </div>
-
+              <div className="mb-4 text-sm text-gray-400">Опубликовано: {formatPublishedDate(listing.publishedAt)}</div>
               <section className="mb-6">
                 <h3 className="text-[18px] font-semibold text-[#1A1A1A] mb-3">Описание</h3>
                 <div className="h-[1px] bg-[#F0F0F0] mb-3" />
                 <p className="text-[#4A4A4A] text-[15px] leading-relaxed">{listing.description}</p>
               </section>
-
               <section className="mb-6">
                 <h3 className="text-[18px] font-semibold text-[#1A1A1A] mb-3">Условия аренды</h3>
                 <div className="h-[1px] bg-[#F0F0F0] mb-1" />
                 <div className="flex justify-between py-2 border-b border-[#F0F0F0]">
                   <span className="text-[#888] text-[15px]">Депозит</span>
-                  <span className="text-[#1A1A1A] font-medium text-[15px]">
-                    {listing.deposit > 0 ? `${listing.deposit} месяц(а)` : 'Без залога'}
-                  </span>
+                  <span className="text-[#1A1A1A] font-medium text-[15px]">{listing.deposit > 0 ? `${listing.deposit} месяц(а)` : 'Без залога'}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-[#F0F0F0]">
                   <span className="text-[#888] text-[15px]">Мин. срок</span>
@@ -187,16 +178,13 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
                 </div>
                 <div className="flex justify-between py-2 border-b border-[#F0F0F0]">
                   <span className="text-[#888] text-[15px]">Коммуналка</span>
-                  <span className="text-[#1A1A1A] font-medium text-[15px]">
-                    {listing.utilitiesIncluded ? 'Включена' : 'Отдельно'}
-                  </span>
+                  <span className="text-[#1A1A1A] font-medium text-[15px]">{listing.utilitiesIncluded ? 'Включена' : 'Отдельно'}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-[#F0F0F0]">
                   <span className="text-[#888] text-[15px]">Доступно с</span>
                   <span className="text-[#1A1A1A] font-medium text-[15px]">{listing.availableFrom}</span>
                 </div>
               </section>
-
               <section className="mb-8">
                 <h3 className="text-[18px] font-semibold text-[#1A1A1A] mb-3">Удобства</h3>
                 <div className="h-[1px] bg-[#F0F0F0] mb-3" />
