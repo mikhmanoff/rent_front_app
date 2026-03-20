@@ -18,7 +18,6 @@ const PhotoSlider: React.FC<PhotoSliderProps> = ({
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Sync scroll position if initialIndex changes (e.g. from external source)
   useEffect(() => {
     if (scrollRef.current) {
       const width = scrollRef.current.offsetWidth;
@@ -43,7 +42,6 @@ const PhotoSlider: React.FC<PhotoSliderProps> = ({
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.target as HTMLImageElement;
-    // Avoid infinite loop if placeholder also fails
     if (!img.src.includes('placeholder.com')) {
       img.src = PLACEHOLDER_PHOTO;
     }
@@ -55,27 +53,29 @@ const PhotoSlider: React.FC<PhotoSliderProps> = ({
         ref={scrollRef}
         onScroll={handleScroll}
         className="flex overflow-x-auto snap-x snap-mandatory h-full no-scrollbar overscroll-x-contain"
+        style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}
       >
         {photos.map((photo, i) => (
           <div key={i} className="w-full h-full flex-shrink-0 snap-start">
             <img 
               src={photo} 
-              alt={`Property photo ${i + 1}`} 
+              alt={`Photo ${i + 1}`} 
               className="w-full h-full object-cover"
               loading="lazy"
+              draggable={false}
               onError={handleImageError}
             />
           </div>
         ))}
       </div>
       
-      {/* Pagination indicators dots */}
+      {/* Pagination bars */}
       <div className="absolute bottom-4 left-0 right-0 flex flex-col items-center gap-2 z-10 pointer-events-none px-6">
          <div className="flex justify-center gap-1 w-full">
            {photos.map((_, i) => (
             <div 
               key={i} 
-              className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+              className={`h-1 flex-1 rounded-full transition-all duration-500 ease-out ${
                 i === activeIndex ? 'bg-white shadow-sm scale-y-110' : 'bg-white/30'
               }`}
               style={{ maxWidth: '40px' }}

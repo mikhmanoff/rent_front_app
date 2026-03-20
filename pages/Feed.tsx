@@ -179,11 +179,15 @@ const Feed: React.FC<FeedProps> = ({
         )}
       </button>
       
-      {/* Vertical Feed */}
+      {/* Vertical Feed — smoother snap */}
       <div 
         ref={scrollRef}
         onScroll={handleScroll}
         className="w-full h-full overflow-y-scroll snap-y snap-mandatory no-scrollbar"
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          scrollSnapType: 'y mandatory',
+        }}
       >
         {listings.length > 0 ? (
           <>

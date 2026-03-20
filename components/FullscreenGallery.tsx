@@ -13,13 +13,11 @@ const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({ photos, initialIn
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Initial scroll position
     if (scrollRef.current) {
       const width = scrollRef.current.offsetWidth;
       scrollRef.current.scrollLeft = width * initialIndex;
     }
 
-    // Telegram Back Button Integration
     if (window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
       tg.BackButton.show();
@@ -65,37 +63,38 @@ const FullscreenGallery: React.FC<FullscreenGalleryProps> = ({ photos, initialIn
         </button>
       </div>
 
-      {/* Image Swiper Area */}
+      {/* Image Swiper */}
       <div 
         ref={scrollRef}
         onScroll={handleScroll}
         onClick={onClose}
         className="flex-1 flex overflow-x-auto snap-x snap-mandatory no-scrollbar h-full"
+        style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}
       >
         {photos.map((photo, index) => (
           <div key={index} className="w-screen h-full flex-shrink-0 snap-start flex items-center justify-center bg-black">
             <img 
               src={photo} 
-              alt={`Property photo ${index + 1}`} 
+              alt={`Photo ${index + 1}`} 
               className="max-w-full max-h-full object-contain select-none"
               loading="lazy"
+              draggable={false}
               onError={handleImageError}
             />
           </div>
         ))}
       </div>
 
-      {/* Footer Info */}
+      {/* Footer */}
       <div className="absolute bottom-10 left-0 right-0 flex flex-col items-center gap-4 pointer-events-none">
         <div className="text-white text-sm font-medium bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm">
           {currentIndex + 1} / {photos.length}
         </div>
-        
         <div className="flex gap-2">
           {photos.map((_, index) => (
             <div 
               key={index}
-              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+              className={`w-2 h-2 rounded-full transition-all duration-500 ease-out ${
                 index === currentIndex ? 'bg-white scale-125' : 'bg-white/30'
               }`}
             />
