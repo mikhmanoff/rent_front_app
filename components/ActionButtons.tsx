@@ -34,10 +34,14 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
     haptic?.impactOccurred('light');
     const botUsername = import.meta.env.VITE_BOT_USERNAME || 'rentaly_bot';
     const url = `https://t.me/${botUsername}/app`;
+    const text = shareDescription || 'Смотри какие квартиры в Ташкенте! 🏠';
+    
     if (tg?.openTelegramLink) {
-      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent('Смотри какие квартиры в Ташкенте! 🏠')}`);
+      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`);
     } else {
-      navigator.clipboard.writeText(url);
+      const fullText = `${text}\n${url}`;
+      navigator.clipboard?.writeText(fullText);
+      alert('Скопировано!');
     }
   };
 
@@ -86,19 +90,15 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
     setPendingAction(null);
   };
 
-  const shareText = shareDescription || 'Смотри какую квартиру нашёл в Ташкенте! 🏠';
-
   return (
     <>
       <div className="flex flex-col gap-2 w-full">
-        {/* Compact unlock badge — single line */}
         {unlocked && (
           <div className="text-center text-[10px] font-bold text-green-600 uppercase tracking-wider leading-none">
             ✅ Номера открыты · {unlockMinutes} мин
           </div>
         )}
 
-        {/* Primary: Написать */}
         <button 
           onClick={() => handleContactAction('message')}
           className="w-full bg-[#2481cc] text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-md"
@@ -114,7 +114,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
           Написать
         </button>
 
-        {/* Secondary row */}
         <div className="grid grid-cols-2 gap-2 w-full">
           <button 
             onClick={() => handleContactAction('call')}
@@ -145,7 +144,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
       {showShareGate && (
         <ShareGate
           listingId={id}
-          shareText={shareText}
+          shareText={shareDescription || ''}
           onUnlocked={handleUnlocked}
           onClose={() => { setShowShareGate(false); setPendingAction(null); }}
         />

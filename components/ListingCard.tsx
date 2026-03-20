@@ -28,14 +28,33 @@ function formatPrice(amount: number, currency: string): string {
 
 function buildShareDescription(listing: Listing): string {
   const price = formatPrice(listing.pricePerMonth, listing.currency);
-  const parts = [
-    `🏠 ${listing.rooms} комн, ${listing.area} м²`,
-    `💰 ${price}/мес`,
-    `📍 ${listing.address}`,
-  ];
-  if (listing.furniture) parts.push('✅ Мебель');
-  if (listing.conditioner) parts.push('✅ Кондиционер');
-  return parts.join('\n');
+  const botUsername = import.meta.env.VITE_BOT_USERNAME || 'rentaly_bot';
+  
+  const lines: string[] = [];
+  
+  // Main info
+  lines.push(`🏠 ${listing.rooms} комн, ${listing.area} м², ${listing.floor}/${listing.totalFloors} этаж`);
+  lines.push(`💰 ${price}/мес`);
+  
+  // Location
+  if (listing.address) {
+    lines.push(`📍 ${listing.address}`);
+  }
+  
+  // Amenities
+  const amenities: string[] = [];
+  if (listing.furniture) amenities.push('Мебель');
+  if (listing.conditioner) amenities.push('Кондиционер');
+  if (listing.renovation) amenities.push('Ремонт');
+  if (amenities.length > 0) {
+    lines.push(`✅ ${amenities.join(' · ')}`);
+  }
+  
+  // CTA
+  lines.push('');
+  lines.push(`🔍 Найди квартиру мечты в Ташкенте в @${botUsername}`);
+  
+  return lines.join('\n');
 }
 
 const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggleFavorite, onGalleryChange }) => {
@@ -45,7 +64,6 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
   
   const photoTouchStart = useRef<{ x: number; y: number; time: number } | null>(null);
 
-  // Notify parent when gallery opens/closes
   useEffect(() => {
     onGalleryChange?.(showFullscreen);
   }, [showFullscreen, onGalleryChange]);

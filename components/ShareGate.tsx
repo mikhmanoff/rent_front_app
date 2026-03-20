@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 const UNLOCK_DURATION_MS = 60 * 60 * 1000; // 1 час
-const SHARE_DELAY_SEC = 15; // 15 секунд лаг после нажатия
+const SHARE_DELAY_SEC = 15;
 
 interface ShareGateProps {
   listingId: number;
@@ -16,7 +16,7 @@ const ShareGate: React.FC<ShareGateProps> = ({
   onUnlocked,
   onClose,
 }) => {
-  const [countdown, setCountdown] = useState(0); // обратный отсчёт в секундах
+  const [countdown, setCountdown] = useState(0);
   const [isWaiting, setIsWaiting] = useState(false);
   const [shared, setShared] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -24,7 +24,6 @@ const ShareGate: React.FC<ShareGateProps> = ({
   const tg = window.Telegram?.WebApp;
   const haptic = tg?.HapticFeedback;
 
-  // Проверяем глобальный unlock при открытии
   useEffect(() => {
     if (isGloballyUnlocked()) {
       haptic?.notificationOccurred('success');
@@ -32,14 +31,12 @@ const ShareGate: React.FC<ShareGateProps> = ({
     }
   }, []);
 
-  // Таймер обратного отсчёта
   useEffect(() => {
     if (countdown > 0) {
       timerRef.current = setInterval(() => {
         setCountdown(prev => {
           if (prev <= 1) {
             if (timerRef.current) clearInterval(timerRef.current);
-            // Время вышло — засчитываем шару
             setGlobalUnlock();
             setShared(true);
             recordShareToServer(listingId);
@@ -59,12 +56,12 @@ const ShareGate: React.FC<ShareGateProps> = ({
   const handleShare = () => {
     haptic?.impactOccurred('medium');
 
-    // Ссылка на бота
     const botUsername = import.meta.env.VITE_BOT_USERNAME || 'rentaly_bot';
     const botUrl = `https://t.me/${botUsername}/app`;
-    const messageText = `${shareText}\n\n🔍 Найди квартиру мечты в Ташкенте:`;
+    
+    // Use the rich description from the listing
+    const messageText = shareText || '🔍 Найди квартиру мечты в Ташкенте';
 
-    // Открываем share dialog
     if (tg?.openTelegramLink) {
       const params = new URLSearchParams({
         url: botUrl,
@@ -77,7 +74,6 @@ const ShareGate: React.FC<ShareGateProps> = ({
       tg?.showAlert?.('Ссылка скопирована! Отправьте её друзьям.');
     }
 
-    // Запускаем обратный отсчёт 15 секунд
     setIsWaiting(true);
     setCountdown(SHARE_DELAY_SEC);
   };
@@ -86,13 +82,11 @@ const ShareGate: React.FC<ShareGateProps> = ({
 
   return (
     <>
-      {/* Overlay */}
       <div 
         className="fixed inset-0 bg-black/60 z-[150] animate-fade-in backdrop-blur-sm"
         onClick={!isWaiting ? onClose : undefined}
       />
       
-      {/* Bottom Sheet */}
       <div className="fixed inset-x-0 bottom-0 z-[151] animate-slide-in-up">
         <div className="bg-white rounded-t-[28px] shadow-2xl overflow-hidden">
           <div className="flex justify-center pt-3 pb-1">
@@ -100,7 +94,6 @@ const ShareGate: React.FC<ShareGateProps> = ({
           </div>
 
           <div className="px-6 pb-8 pt-2">
-            {/* Icon + Title */}
             <div className="text-center mb-6">
               <div className="text-[56px] mb-3">
                 {shared ? '🎉' : isWaiting ? '⏳' : '🔒'}
@@ -123,10 +116,8 @@ const ShareGate: React.FC<ShareGateProps> = ({
               </p>
             </div>
 
-            {/* Countdown timer */}
             {isWaiting && countdown > 0 && (
               <div className="mb-6">
-                {/* Circular progress */}
                 <div className="flex justify-center mb-4">
                   <div className="relative w-20 h-20">
                     <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
@@ -153,7 +144,6 @@ const ShareGate: React.FC<ShareGateProps> = ({
               </div>
             )}
 
-            {/* Share Button — only before sharing */}
             {!isWaiting && !shared && (
               <button 
                 onClick={handleShare}
@@ -182,7 +172,7 @@ const ShareGate: React.FC<ShareGateProps> = ({
 };
 
 // ============================================
-// Global unlock logic (1 hour access)
+// Global unlock logic
 // ============================================
 
 const GLOBAL_UNLOCK_KEY = 'global_unlock_until';
@@ -223,7 +213,6 @@ function recordShareToServer(listingId: number) {
   }
 }
 
-// Legacy exports for compatibility
 export function getLocalShareCount(listingId: number): number {
   return isGloballyUnlocked() ? 99 : 0;
 }
