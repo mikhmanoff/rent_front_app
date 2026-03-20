@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface Option {
@@ -43,10 +42,10 @@ const MultiSelectBottomSheet: React.FC<MultiSelectBottomSheetProps> = ({
   return (
     <>
       <div 
-        className="fixed inset-0 bg-black/50 z-[100] animate-fade-in" 
+        className="fixed inset-0 bg-black/50 z-[210] animate-fade-in" 
         onClick={onClose}
       />
-      <div className="fixed inset-x-0 bottom-0 h-[80vh] bg-white rounded-t-[32px] z-[110] flex flex-col animate-slide-in-up shadow-2xl overflow-hidden">
+      <div className="fixed inset-x-0 bottom-0 h-[80vh] bg-white rounded-t-[32px] z-[220] flex flex-col animate-slide-in-up shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="text-xl font-bold">{title}</h2>
           <button onClick={onClose} className="p-2 text-gray-400">
