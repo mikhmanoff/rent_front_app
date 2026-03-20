@@ -15,20 +15,11 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
   const [showShareGate, setShowShareGate] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [pendingAction, setPendingAction] = useState<'call' | 'message' | null>(null);
-  const [unlockMinutes, setUnlockMinutes] = useState(0);
 
-  // Проверяем глобальный unlock
   useEffect(() => {
-    const check = () => {
-      const isUnlocked = isGloballyUnlocked();
-      setUnlocked(isUnlocked);
-      if (isUnlocked) {
-        const remaining = getUnlockTimeRemaining();
-        setUnlockMinutes(Math.ceil(remaining / 60000));
-      }
-    };
+    const check = () => setUnlocked(isGloballyUnlocked());
     check();
-    const interval = setInterval(check, 10000); // проверяем каждые 10 сек
+    const interval = setInterval(check, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -50,39 +41,28 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
       setShowShareGate(true);
       return;
     }
-
-    if (action === 'message') {
-      doMessage();
-    } else {
-      doCall();
-    }
+    action === 'message' ? doMessage() : doCall();
   };
 
   const doMessage = () => {
     haptic?.impactOccurred('light');
-
     if (telegram) {
       const username = telegram.replace('@', '');
       const tgUrl = `https://t.me/${username}`;
       tg?.openTelegramLink ? tg.openTelegramLink(tgUrl) : window.open(tgUrl, '_blank');
       return;
     }
-
     if (phone) {
       const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
       const tgUrl = `https://t.me/${cleanPhone}`;
       tg?.openTelegramLink ? tg.openTelegramLink(tgUrl) : window.open(tgUrl, '_blank');
       return;
     }
-
     tg?.showAlert?.('Контакт не указан');
   };
 
   const doCall = () => {
-    if (!phone) {
-      tg?.showAlert?.('Номер телефона не указан');
-      return;
-    }
+    if (!phone) { tg?.showAlert?.('Номер телефона не указан'); return; }
     haptic?.impactOccurred('light');
     try {
       tg?.openLink ? tg.openLink(`tel:${phone}`) : (window.location.href = `tel:${phone}`);
@@ -95,13 +75,8 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
   const handleUnlocked = () => {
     setUnlocked(true);
     setShowShareGate(false);
-    setUnlockMinutes(60);
-
-    if (pendingAction === 'message') {
-      setTimeout(doMessage, 300);
-    } else if (pendingAction === 'call') {
-      setTimeout(doCall, 300);
-    }
+    if (pendingAction === 'message') setTimeout(doMessage, 300);
+    else if (pendingAction === 'call') setTimeout(doCall, 300);
     setPendingAction(null);
   };
 
@@ -109,14 +84,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
 
   return (
     <>
-      <div className="flex flex-col gap-3 w-full">
-        {/* Unlock badge */}
-        {unlocked && (
-          <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-green-600 uppercase tracking-wider">
-            <span>✅</span> Номера открыты · {unlockMinutes} мин осталось
-          </div>
-        )}
-
+      <div className="flex flex-col gap-2 w-full">
         {/* Primary: Написать */}
         <button 
           onClick={() => handleContactAction('message')}
@@ -133,11 +101,11 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
           Написать
         </button>
 
-        {/* Secondary: Позвонить + Поделиться */}
-        <div className="grid grid-cols-2 gap-3 w-full">
+        {/* Secondary row */}
+        <div className="grid grid-cols-2 gap-2 w-full">
           <button 
             onClick={() => handleContactAction('call')}
-            className="bg-white border border-gray-200 text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm"
+            className="bg-white border border-gray-200 text-black font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm"
           >
             {!unlocked && (
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
@@ -151,7 +119,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
           </button>
           <button 
             onClick={handleShare}
-            className="bg-white border border-gray-200 text-[#2481cc] font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm"
+            className="bg-white border border-gray-200 text-[#2481cc] font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -161,16 +129,12 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
         </div>
       </div>
 
-      {/* Share Gate Modal */}
       {showShareGate && (
         <ShareGate
           listingId={id}
           shareText={shareText}
           onUnlocked={handleUnlocked}
-          onClose={() => {
-            setShowShareGate(false);
-            setPendingAction(null);
-          }}
+          onClose={() => { setShowShareGate(false); setPendingAction(null); }}
         />
       )}
     </>
