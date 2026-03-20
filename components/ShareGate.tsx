@@ -3,11 +3,27 @@ import React, { useState, useEffect, useRef } from 'react';
 const UNLOCK_DURATION_MS = 60 * 60 * 1000; // 1 час
 const SHARE_DELAY_SEC = 15;
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+
 interface ShareGateProps {
   listingId: number;
   shareText: string;
   onUnlocked: () => void;
   onClose: () => void;
+}
+
+async function prepareShareMessage(listingId: number, initData: string): Promise<string | null> {
+  try {
+    const resp = await fetch(
+      `${API_BASE}/api/prepare-share/${listingId}?init_data=${encodeURIComponent(initData)}`,
+      { method: 'POST' }
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.prepared_message_id || null;
+  } catch {
+    return null;
+  }
 }
 
 const ShareGate: React.FC<ShareGateProps> = ({
@@ -19,6 +35,7 @@ const ShareGate: React.FC<ShareGateProps> = ({
   const [countdown, setCountdown] = useState(0);
   const [isWaiting, setIsWaiting] = useState(false);
   const [shared, setShared] = useState(false);
+  const [isPreparing, setIsPreparing] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const tg = window.Telegram?.WebApp;
@@ -53,29 +70,50 @@ const ShareGate: React.FC<ShareGateProps> = ({
     }
   }, [isWaiting]);
 
-  const handleShare = () => {
-    haptic?.impactOccurred('medium');
+  const startCountdown = () => {
+    setIsWaiting(true);
+    setCountdown(SHARE_DELAY_SEC);
+  };
 
+  const handleShare = async () => {
+    haptic?.impactOccurred('medium');
+    setIsPreparing(true);
+
+    const initData = tg?.initData;
+    
+    // Try native shareMessage (with photo)
+    if (initData && tg?.shareMessage) {
+      const preparedId = await prepareShareMessage(listingId, initData);
+      if (preparedId) {
+        setIsPreparing(false);
+        try {
+          tg.shareMessage(preparedId, (success: boolean) => {
+            if (success) {
+              startCountdown();
+            }
+          });
+          return;
+        } catch (e) {
+          console.warn('[share-gate] shareMessage failed:', e);
+        }
+      }
+    }
+
+    // Fallback: text share + auto countdown
+    setIsPreparing(false);
     const botUsername = import.meta.env.VITE_BOT_USERNAME || 'rentaly_bot';
     const botUrl = `https://t.me/${botUsername}/app`;
-    
-    // Use the rich description from the listing
     const messageText = shareText || '🔍 Найди квартиру мечты в Ташкенте';
 
     if (tg?.openTelegramLink) {
-      const params = new URLSearchParams({
-        url: botUrl,
-        text: messageText,
-      });
+      const params = new URLSearchParams({ url: botUrl, text: messageText });
       tg.openTelegramLink(`https://t.me/share/url?${params.toString()}`);
     } else {
-      const fullText = `${messageText}\n${botUrl}`;
-      navigator.clipboard?.writeText(fullText);
+      navigator.clipboard?.writeText(`${messageText}\n${botUrl}`);
       tg?.showAlert?.('Ссылка скопирована! Отправьте её друзьям.');
     }
 
-    setIsWaiting(true);
-    setCountdown(SHARE_DELAY_SEC);
+    startCountdown();
   };
 
   const progress = countdown > 0 ? (SHARE_DELAY_SEC - countdown) / SHARE_DELAY_SEC : 0;
@@ -147,12 +185,17 @@ const ShareGate: React.FC<ShareGateProps> = ({
             {!isWaiting && !shared && (
               <button 
                 onClick={handleShare}
-                className="w-full py-5 rounded-2xl font-bold text-[17px] flex items-center justify-center gap-3 transition-all shadow-lg active:scale-[0.98] bg-[#2481cc] text-white"
+                disabled={isPreparing}
+                className={`w-full py-5 rounded-2xl font-bold text-[17px] flex items-center justify-center gap-3 transition-all shadow-lg active:scale-[0.98] bg-[#2481cc] text-white ${isPreparing ? 'opacity-70' : ''}`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-                Отправить другу
+                {isPreparing ? (
+                  <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                )}
+                {isPreparing ? 'Подготовка...' : 'Отправить другу'}
               </button>
             )}
 
@@ -205,7 +248,6 @@ export function getUnlockTimeRemaining(): number {
 function recordShareToServer(listingId: number) {
   const initData = window.Telegram?.WebApp?.initData;
   if (initData) {
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001';
     fetch(
       `${API_BASE}/api/shares/${listingId}?init_data=${encodeURIComponent(initData)}`,
       { method: 'POST' }

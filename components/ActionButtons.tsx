@@ -8,6 +8,23 @@ interface ActionButtonsProps {
   shareDescription?: string;
 }
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+
+async function prepareShareMessage(listingId: number, initData: string): Promise<string | null> {
+  try {
+    const resp = await fetch(
+      `${API_BASE}/api/prepare-share/${listingId}?init_data=${encodeURIComponent(initData)}`,
+      { method: 'POST' }
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.prepared_message_id || null;
+  } catch (e) {
+    console.error('[share] prepare error:', e);
+    return null;
+  }
+}
+
 const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shareDescription }) => {
   const tg = window.Telegram?.WebApp;
   const haptic = tg?.HapticFeedback;
@@ -16,6 +33,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
   const [unlocked, setUnlocked] = useState(false);
   const [pendingAction, setPendingAction] = useState<'call' | 'message' | null>(null);
   const [unlockMinutes, setUnlockMinutes] = useState(0);
+  const [isSharing, setIsSharing] = useState(false);
 
   useEffect(() => {
     const check = () => {
@@ -30,8 +48,33 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
     return () => clearInterval(interval);
   }, []);
 
-  const handleShare = () => {
+  // Try native shareMessage (with photo), fall back to openTelegramLink (text only)
+  const handleShare = async () => {
     haptic?.impactOccurred('light');
+    setIsSharing(true);
+
+    const initData = tg?.initData;
+    
+    // Try native shareMessage if available
+    if (initData && tg?.shareMessage) {
+      const preparedId = await prepareShareMessage(id, initData);
+      if (preparedId) {
+        try {
+          tg.shareMessage(preparedId, (success: boolean) => {
+            setIsSharing(false);
+            if (success) {
+              haptic?.notificationOccurred('success');
+            }
+          });
+          return;
+        } catch (e) {
+          console.warn('[share] shareMessage failed, falling back:', e);
+        }
+      }
+    }
+
+    // Fallback: text-only share via openTelegramLink
+    setIsSharing(false);
     const botUsername = import.meta.env.VITE_BOT_USERNAME || 'rentaly_bot';
     const url = `https://t.me/${botUsername}/app`;
     const text = shareDescription || 'Смотри какие квартиры в Ташкенте! 🏠';
@@ -39,8 +82,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`);
     } else {
-      const fullText = `${text}\n${url}`;
-      navigator.clipboard?.writeText(fullText);
+      navigator.clipboard?.writeText(`${text}\n${url}`);
       alert('Скопировано!');
     }
   };
@@ -131,12 +173,17 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
           </button>
           <button 
             onClick={handleShare}
-            className="bg-white border border-gray-200 text-[#2481cc] font-bold py-3 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm text-[14px]"
+            disabled={isSharing}
+            className={`bg-white border border-gray-200 text-[#2481cc] font-bold py-3 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm text-[14px] ${isSharing ? 'opacity-50' : ''}`}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-            </svg>
-            Поделиться
+            {isSharing ? (
+              <div className="w-4 h-4 border-2 border-[#2481cc] border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+            )}
+            {isSharing ? '...' : 'Поделиться'}
           </button>
         </div>
       </div>
