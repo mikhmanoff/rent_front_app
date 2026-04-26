@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FilterState } from '../types';
 import { useListings } from '../hooks/useListings';
 import { getFavorites, addFavorite, removeFavorite } from '../api/client';
+import { trackListingView, trackFavorite, trackFilter } from '../hooks/useAnalytics';
 import ListingCard from '../components/ListingCard';
 import FilterPanel from '../components/FilterPanel';
 import EndScreen from '../components/EndScreen';
@@ -36,14 +37,11 @@ const Feed: React.FC<FeedProps> = ({
   const [isAnimating, setIsAnimating] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
-  // Touch tracking
   const touchStartY = useRef(0);
   const touchMoved = useRef(false);
 
-  // Total slides count
   const totalSlides = listings.length + (!hasMore && listings.length > 0 ? 1 : 0) + (isLoading && listings.length > 0 ? 1 : 0);
 
-  // Load favorites
   useEffect(() => {
     if (favoritesLoaded) return;
     async function loadFav() {
@@ -64,6 +62,10 @@ const Feed: React.FC<FeedProps> = ({
     const isFav = favorites.includes(id);
     const newFavorites = isFav ? favorites.filter(fid => fid !== id) : [...favorites, id];
     setFavorites(newFavorites);
+    
+    // Analytics
+    trackFavorite(id, isFav ? 'remove' : 'add');
+
     const hasTelegram = !!window.Telegram?.WebApp?.initData;
     if (hasTelegram) {
       try { isFav ? await removeFavorite(id) : await addFavorite(id); }
@@ -74,7 +76,7 @@ const Feed: React.FC<FeedProps> = ({
   };
 
   const goTo = useCallback((index: number) => {
-    if (isAnimating || isGalleryOpen) return; // Block when gallery is open
+    if (isAnimating) return;
     const maxIndex = totalSlides - 1;
     const next = Math.max(0, Math.min(index, maxIndex));
     if (next === currentIndex) return;
@@ -83,24 +85,26 @@ const Feed: React.FC<FeedProps> = ({
     setCurrentIndex(next);
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light');
 
+    // Analytics: track listing view
+    if (next < listings.length) {
+      trackListingView(listings[next].id);
+    }
+
     setTimeout(() => {
       setIsAnimating(false);
       if (next >= listings.length - 3 && hasMore && !isLoading) loadMore();
     }, ANIMATION_MS);
-  }, [isAnimating, isGalleryOpen, currentIndex, totalSlides, listings.length, hasMore, isLoading, loadMore]);
+  }, [isAnimating, currentIndex, totalSlides, listings.length, hasMore, isLoading, loadMore, listings]);
 
-  // Touch events — block when gallery open
   const onTouchStart = useCallback((e: React.TouchEvent) => {
-    if (isGalleryOpen) return;
     touchStartY.current = e.touches[0].clientY;
     touchMoved.current = false;
-  }, [isGalleryOpen]);
+  }, []);
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (isGalleryOpen) return;
     const diff = Math.abs(e.touches[0].clientY - touchStartY.current);
     if (diff > 10) touchMoved.current = true;
-  }, [isGalleryOpen]);
+  }, []);
 
   const onTouchEnd = useCallback((e: React.TouchEvent) => {
     if (isGalleryOpen) return;
@@ -108,11 +112,7 @@ const Feed: React.FC<FeedProps> = ({
     const diff = touchStartY.current - e.changedTouches[0].clientY;
     if (diff > SWIPE_THRESHOLD) goTo(currentIndex + 1);
     else if (diff < -SWIPE_THRESHOLD) goTo(currentIndex - 1);
-  }, [isGalleryOpen, currentIndex, goTo]);
-
-  const handleGalleryChange = useCallback((isOpen: boolean) => {
-    setIsGalleryOpen(isOpen);
-  }, []);
+  }, [currentIndex, goTo, isGalleryOpen]);
 
   const handleRestart = () => {
     setCurrentIndex(0);
@@ -128,6 +128,15 @@ const Feed: React.FC<FeedProps> = ({
       alert('Подписка оформлена!');
     }
   };
+
+  const handleFiltersChange = (newFilters: FilterState) => {
+    setFilters(newFilters);
+    trackFilter(newFilters);
+  };
+
+  const handleGalleryChange = useCallback((isOpen: boolean) => {
+    setIsGalleryOpen(isOpen);
+  }, []);
 
   // Loading
   if ((isLoading && listings.length === 0) || !favoritesLoaded) {
@@ -154,33 +163,31 @@ const Feed: React.FC<FeedProps> = ({
 
   return (
     <div className="relative w-full h-[100dvh] bg-white overflow-hidden">
-      {/* Filter + Favorites buttons — HIDDEN when gallery is open */}
       {!isGalleryOpen && (
-        <>
-          <FilterPanel filters={filters} setFilters={setFilters} count={total} isOpen={isFilterOpen} setIsOpen={setIsFilterOpen} />
+        <FilterPanel filters={filters} setFilters={handleFiltersChange} count={total} isOpen={isFilterOpen} setIsOpen={setIsFilterOpen} />
+      )}
 
-          <button onClick={onOpenFavorites}
-            className="fixed top-4 right-4 z-40 bg-black/20 backdrop-blur-md w-10 h-10 rounded-full border border-white/10 flex items-center justify-center active:scale-95 transition-transform"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-            </svg>
-            {favorites.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                {favorites.length > 99 ? '99' : favorites.length}
-              </span>
-            )}
-          </button>
-        </>
+      {!isGalleryOpen && (
+        <button onClick={onOpenFavorites}
+          className="fixed top-4 right-4 z-40 bg-black/20 backdrop-blur-md w-10 h-10 rounded-full border border-white/10 flex items-center justify-center active:scale-95 transition-transform"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+          {favorites.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+              {favorites.length > 99 ? '99' : favorites.length}
+            </span>
+          )}
+        </button>
       )}
       
-      {/* Feed — CSS transform, no native scroll */}
       <div 
         className="w-full h-full"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        style={{ touchAction: isGalleryOpen ? 'none' : 'pan-x' }}  
+        style={{ touchAction: 'pan-x' }}  
       >
         {listings.length > 0 ? (
           <div style={{

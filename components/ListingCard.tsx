@@ -3,6 +3,7 @@ import { Listing } from '../types';
 import PhotoSlider from './PhotoSlider';
 import ActionButtons from './ActionButtons';
 import FullscreenGallery from './FullscreenGallery';
+import { trackDetailsOpen, trackPhotoGallery } from '../hooks/useAnalytics';
 
 interface ListingCardProps {
   listing: Listing;
@@ -28,20 +29,15 @@ function formatPrice(amount: number, currency: string): string {
 
 function buildShareDescription(listing: Listing): string {
   const price = formatPrice(listing.pricePerMonth, listing.currency);
-  const botUsername = import.meta.env.VITE_BOT_USERNAME || 'rentaly_bot';
-  
   const lines: string[] = [];
   
-  // Main info
   lines.push(`🏠 ${listing.rooms} комн, ${listing.area} м², ${listing.floor}/${listing.totalFloors} этаж`);
   lines.push(`💰 ${price}/мес`);
   
-  // Location
   if (listing.address) {
     lines.push(`📍 ${listing.address}`);
   }
   
-  // Amenities
   const amenities: string[] = [];
   if (listing.furniture) amenities.push('Мебель');
   if (listing.conditioner) amenities.push('Кондиционер');
@@ -50,9 +46,8 @@ function buildShareDescription(listing: Listing): string {
     lines.push(`✅ ${amenities.join(' · ')}`);
   }
   
-  // CTA
   lines.push('');
-  lines.push(`🔍 Найди квартиру мечты в Ташкенте в @${botUsername}`);
+  lines.push(`🔍 Найди квартиру мечты в Ташкенте`);
   
   return lines.join('\n');
 }
@@ -89,6 +84,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
     
     if (dx < 10 && dy < 10 && dt < 300) {
       setShowFullscreen(true);
+      trackPhotoGallery(listing.id);  // Analytics
     }
     photoTouchStart.current = null;
   };
@@ -96,6 +92,11 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
   const closeGallery = (lastIndex: number) => {
     setCurrentPhotoIndex(lastIndex);
     setShowFullscreen(false);
+  };
+
+  const handleDetailsOpen = () => {
+    setIsDetailsOpen(true);
+    trackDetailsOpen(listing.id);  // Analytics
   };
 
   const shareDescription = buildShareDescription(listing);
@@ -146,7 +147,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isFavorite, onToggle
             <span className="truncate">{listing.address}</span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button onClick={() => setIsDetailsOpen(true)}
+            <button onClick={handleDetailsOpen}
               className="text-blue-500 text-[11px] font-bold uppercase tracking-wider"
             >Подробнее →</button>
             <button onClick={handleFavClick}

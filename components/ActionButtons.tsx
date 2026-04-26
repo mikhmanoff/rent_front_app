@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ShareGate, { isGloballyUnlocked, getUnlockTimeRemaining } from './ShareGate';
+import { trackContactClick, trackShare } from '../hooks/useAnalytics';
 
 interface ActionButtonsProps {
   id: number;
@@ -48,14 +49,13 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
     return () => clearInterval(interval);
   }, []);
 
-  // Try native shareMessage (with photo), fall back to openTelegramLink (text only)
   const handleShare = async () => {
     haptic?.impactOccurred('light');
     setIsSharing(true);
+    trackShare(id, 'click');  // Analytics
 
     const initData = tg?.initData;
     
-    // Try native shareMessage if available
     if (initData && tg?.shareMessage) {
       const preparedId = await prepareShareMessage(id, initData);
       if (preparedId) {
@@ -64,6 +64,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
             setIsSharing(false);
             if (success) {
               haptic?.notificationOccurred('success');
+              trackShare(id, 'sent');  // Analytics
             }
           });
           return;
@@ -73,7 +74,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
       }
     }
 
-    // Fallback: text-only share via openTelegramLink
     setIsSharing(false);
     const botUsername = import.meta.env.VITE_BOT_USERNAME || 'rentaly_bot';
     const url = `https://t.me/${botUsername}/app`;
@@ -94,6 +94,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
       setShowShareGate(true);
       return;
     }
+    trackContactClick(id, action);  // Analytics
     action === 'message' ? doMessage() : doCall();
   };
 
@@ -127,6 +128,9 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ id, phone, telegram, shar
     setUnlocked(true);
     setUnlockMinutes(60);
     setShowShareGate(false);
+    if (pendingAction) {
+      trackContactClick(id, pendingAction);  // Analytics
+    }
     if (pendingAction === 'message') setTimeout(doMessage, 300);
     else if (pendingAction === 'call') setTimeout(doCall, 300);
     setPendingAction(null);

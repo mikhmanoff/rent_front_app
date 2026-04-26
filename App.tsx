@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Feed from './pages/Feed';
 import Favorites from './pages/Favorites';
+import { analytics } from './hooks/useAnalytics';
 
 type Page = 'feed' | 'favorites';
 
@@ -17,6 +18,7 @@ const App: React.FC = () => {
       tg.headerColor = '#ffffff';
       tg.backgroundColor = '#ffffff';
     }
+    analytics.init();
   }, []);
 
   return (
