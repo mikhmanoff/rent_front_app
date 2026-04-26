@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { trackShare } from '../hooks/useAnalytics';
 
 const UNLOCK_DURATION_MS = 60 * 60 * 1000; // 1 час
 const SHARE_DELAY_SEC = 15;
@@ -57,6 +58,7 @@ const ShareGate: React.FC<ShareGateProps> = ({
             setGlobalUnlock();
             setShared(true);
             recordShareToServer(listingId);
+            trackShare(listingId, 'unlock');  // Analytics
             haptic?.notificationOccurred('success');
             setTimeout(() => onUnlocked(), 600);
             return 0;
@@ -78,10 +80,10 @@ const ShareGate: React.FC<ShareGateProps> = ({
   const handleShare = async () => {
     haptic?.impactOccurred('medium');
     setIsPreparing(true);
+    trackShare(listingId, 'click');  // Analytics
 
     const initData = tg?.initData;
     
-    // Try native shareMessage (with photo)
     if (initData && tg?.shareMessage) {
       const preparedId = await prepareShareMessage(listingId, initData);
       if (preparedId) {
@@ -89,6 +91,7 @@ const ShareGate: React.FC<ShareGateProps> = ({
         try {
           tg.shareMessage(preparedId, (success: boolean) => {
             if (success) {
+              trackShare(listingId, 'sent');  // Analytics
               startCountdown();
             }
           });
@@ -99,7 +102,6 @@ const ShareGate: React.FC<ShareGateProps> = ({
       }
     }
 
-    // Fallback: text share + auto countdown
     setIsPreparing(false);
     const botUsername = import.meta.env.VITE_BOT_USERNAME || 'rentaly_bot';
     const botUrl = `https://t.me/${botUsername}/app`;
