@@ -30,9 +30,9 @@ class AnalyticsTracker {
     try {
       const initData = getInitData();
       const tg = window.Telegram?.WebApp;
-      await fetch(`${API_BASE}/api/analytics/session/start?init_data=${encodeURIComponent(initData)}`, {
+      await fetch(`${API_BASE}/api/analytics/session/start`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
         body: JSON.stringify({
           session_id: this.sessionId,
           device_info: {
@@ -82,9 +82,9 @@ class AnalyticsTracker {
 
     try {
       const initData = getInitData();
-      await fetch(`${API_BASE}/api/analytics/events?init_data=${encodeURIComponent(initData)}`, {
+      await fetch(`${API_BASE}/api/analytics/events`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
         body: JSON.stringify({ session_id: this.sessionId, events }),
       });
     } catch (e) {
@@ -97,13 +97,19 @@ class AnalyticsTracker {
     const duration = Math.round((Date.now() - this.sessionStartTime) / 1000);
     try {
       const initData = getInitData();
-      const payload = JSON.stringify({ session_id: this.sessionId, duration_sec: duration });
-      const url = `${API_BASE}/api/analytics/session/end?init_data=${encodeURIComponent(initData)}`;
+      // sendBeacon cannot set custom headers, so initData travels in the body here
+      const payload = JSON.stringify({ session_id: this.sessionId, duration_sec: duration, init_data: initData });
+      const url = `${API_BASE}/api/analytics/session/end`;
 
       if (navigator.sendBeacon) {
         navigator.sendBeacon(url, new Blob([payload], { type: 'application/json' }));
       } else {
-        await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true });
+        await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+          body: payload,
+          keepalive: true,
+        });
       }
     } catch (e) { /* ignore */ }
   }
