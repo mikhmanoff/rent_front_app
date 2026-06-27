@@ -211,13 +211,13 @@ function getInitData(): string {
 export async function getFavorites(): Promise<number[]> {
   const initData = getInitData();
   if (!initData) return [];
-  
-  const response = await fetch(
-    `${API_BASE}/api/favorites?init_data=${encodeURIComponent(initData)}`
-  );
-  
+
+  const response = await fetch(`${API_BASE}/api/favorites`, {
+    headers: { 'X-Telegram-Init-Data': initData },
+  });
+
   if (!response.ok) return [];
-  
+
   const data = await response.json();
   return data.favorites || [];
 }
@@ -228,12 +228,12 @@ export async function getFavorites(): Promise<number[]> {
 export async function addFavorite(listingId: number): Promise<boolean> {
   const initData = getInitData();
   if (!initData) return false;
-  
-  const response = await fetch(
-    `${API_BASE}/api/favorites/${listingId}?init_data=${encodeURIComponent(initData)}`,
-    { method: 'POST' }
-  );
-  
+
+  const response = await fetch(`${API_BASE}/api/favorites/${listingId}`, {
+    method: 'POST',
+    headers: { 'X-Telegram-Init-Data': initData },
+  });
+
   return response.ok;
 }
 
@@ -243,12 +243,12 @@ export async function addFavorite(listingId: number): Promise<boolean> {
 export async function removeFavorite(listingId: number): Promise<boolean> {
   const initData = getInitData();
   if (!initData) return false;
-  
-  const response = await fetch(
-    `${API_BASE}/api/favorites/${listingId}?init_data=${encodeURIComponent(initData)}`,
-    { method: 'DELETE' }
-  );
-  
+
+  const response = await fetch(`${API_BASE}/api/favorites/${listingId}`, {
+    method: 'DELETE',
+    headers: { 'X-Telegram-Init-Data': initData },
+  });
+
   return response.ok;
 }
 
@@ -256,25 +256,26 @@ export async function removeFavorite(listingId: number): Promise<boolean> {
  * Получить полные данные избранных объявлений
  */
 export async function getFavoriteListings(
-  page: number = 1, 
+  page: number = 1,
   pageSize: number = 20
 ): Promise<ListingsResponse> {
   const initData = getInitData();
   if (!initData) {
     return { items: [], total: 0, page: 1, page_size: pageSize, has_more: false };
   }
-  
+
   const params = new URLSearchParams({
-    init_data: initData,
     page: page.toString(),
     page_size: pageSize.toString(),
   });
-  
-  const response = await fetch(`${API_BASE}/api/favorites/listings?${params}`);
-  
+
+  const response = await fetch(`${API_BASE}/api/favorites/listings?${params}`, {
+    headers: { 'X-Telegram-Init-Data': initData },
+  });
+
   if (!response.ok) {
     return { items: [], total: 0, page: 1, page_size: pageSize, has_more: false };
   }
-  
+
   return response.json();
 }

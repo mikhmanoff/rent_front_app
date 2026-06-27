@@ -13,10 +13,10 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 async function prepareShareMessage(listingId: number, initData: string): Promise<string | null> {
   try {
-    const resp = await fetch(
-      `${API_BASE}/api/prepare-share/${listingId}?init_data=${encodeURIComponent(initData)}`,
-      { method: 'POST' }
-    );
+    const resp = await fetch(`${API_BASE}/api/prepare-share/${listingId}`, {
+      method: 'POST',
+      headers: { 'X-Telegram-Init-Data': initData },
+    });
     if (!resp.ok) return null;
     const data = await resp.json();
     return data.prepared_message_id || null;

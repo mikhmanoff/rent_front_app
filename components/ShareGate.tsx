@@ -15,10 +15,10 @@ interface ShareGateProps {
 
 async function prepareShareMessage(listingId: number, initData: string): Promise<string | null> {
   try {
-    const resp = await fetch(
-      `${API_BASE}/api/prepare-share/${listingId}?init_data=${encodeURIComponent(initData)}`,
-      { method: 'POST' }
-    );
+    const resp = await fetch(`${API_BASE}/api/prepare-share/${listingId}`, {
+      method: 'POST',
+      headers: { 'X-Telegram-Init-Data': initData },
+    });
     if (!resp.ok) return null;
     const data = await resp.json();
     return data.prepared_message_id || null;
@@ -250,10 +250,10 @@ export function getUnlockTimeRemaining(): number {
 function recordShareToServer(listingId: number) {
   const initData = window.Telegram?.WebApp?.initData;
   if (initData) {
-    fetch(
-      `${API_BASE}/api/shares/${listingId}?init_data=${encodeURIComponent(initData)}`,
-      { method: 'POST' }
-    ).catch(() => {});
+    fetch(`${API_BASE}/api/shares/${listingId}`, {
+      method: 'POST',
+      headers: { 'X-Telegram-Init-Data': initData },
+    }).catch(() => {});
   }
 }
 
